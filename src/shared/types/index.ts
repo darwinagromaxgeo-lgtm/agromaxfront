@@ -7,7 +7,64 @@ export interface Product { id: string; name: string; description?: string; categ
 export interface ProductPrice { priceTierId: string; companyId?: string; branchId?: string; price: number; }
 export interface Company { id: string; name: string; ruc: string; address?: string; phone?: string; isActive: boolean; }
 export interface PriceTier { id: string; name: string; description?: string; priority: number; isActive: boolean; }
-export interface Stock { id: string; productId: string; companyId: string; quantity: number; lastUpdated: string; }
+export interface Stock { id: string; productId: string; companyId: string; branchId?: string; quantity: number; lastUpdated: string; }
+export interface BranchAvailabilityPrice { priceTierId: string; price: number; }
+export interface BranchAvailability {
+  branchId: string;
+  branchCode: string;
+  branchName: string;
+  isCurrent: boolean;
+  quantity: number;
+  prices: BranchAvailabilityPrice[];
+}
+export interface StockAvailability {
+  productId: string;
+  productName: string;
+  unit: string;
+  branches: BranchAvailability[];
+}
+export type StockRequestStatus =
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'DISPATCHING'
+  | 'IN_TRANSIT'
+  | 'RECEIVING'
+  | 'RECEIVED'
+  | 'CANCELLED';
+export interface StockRequestItem {
+  productId: string;
+  productName?: string;
+  requestedQuantity: number;
+  approvedQuantity?: number;
+  lotAllocations?: {
+    lotNumber: string;
+    expirationDate?: string;
+    quantity: number;
+  }[];
+}
+export interface StockRequest {
+  id: string;
+  requestingBranchId: string;
+  requestingBranchName?: string;
+  sourceBranchId: string;
+  sourceBranchName?: string;
+  companyId: string;
+  items: StockRequestItem[];
+  status: StockRequestStatus;
+  notes?: string;
+  rejectionReason?: string;
+  requestedBy: string;
+  requestedByName?: string;
+  reviewedByName?: string;
+  reviewedAt?: string;
+  dispatchedByName?: string;
+  dispatchedAt?: string;
+  receivedByName?: string;
+  receivedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 export interface Client { id: string; name: string; documentNumber?: string; phone?: string; email?: string; address?: string; isActive: boolean; }
 
 export interface PaymentMethod { id: string; name: string; isActive: boolean; }

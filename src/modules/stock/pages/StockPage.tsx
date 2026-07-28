@@ -13,10 +13,12 @@ import {
   FileSpreadsheet, Download, Upload, SlidersHorizontal, Truck, X,
 } from 'lucide-react';
 import type { Stock, Company, Product, StockAdjustment, ProductLot } from '../../../shared/types';
+import { useAuth } from '../../../app/providers/AuthProvider';
 
 type ImportRow = { excelName: string; quantity: number; matched: Product | null };
 
 export function StockPage() {
+  const { selectedBranch } = useAuth();
   const [activeTab, setActiveTab] = useState<'inventory' | 'lots' | 'adjustments' | 'transfers'>('inventory');
   const [page, setPage] = useState(1);
   const [companyId, setCompanyId] = useState('');
@@ -59,7 +61,13 @@ export function StockPage() {
   }, {});
   const [adjForm, setAdjForm] = useState({ productId: '', companyId: '', type: 'INCREASE' as 'INCREASE' | 'DECREASE', quantity: 0, reason: '', lotNumber: '', expirationDate: '' });
 
-  const companyList = Array.isArray(companies) ? companies : [];
+  const companyList = (Array.isArray(companies) ? companies : []).filter((company: Company) =>
+    company.isActive
+    && (
+      !selectedBranch?.companyIds?.length
+      || selectedBranch.companyIds.includes(company.id)
+    ),
+  );
   const products = productsData?.data || [];
   const allProducts: Product[] = allProductsData?.data || [];
 
@@ -305,7 +313,13 @@ export function StockPage() {
     }
   };
 
-  React.useEffect(() => { if (!companyId && companyList.length > 0) setCompanyId(companyList[0].id); }, [companyList, companyId]);
+  React.useEffect(() => {
+    if (companyId && companyList.some((company: Company) => company.id === companyId)) return;
+    const preferred = companyList.find(
+      (company: Company) => company.id === selectedBranch?.defaultCompanyId,
+    );
+    setCompanyId(preferred?.id || companyList[0]?.id || '');
+  }, [companyList, companyId, selectedBranch]);
 
   const tabs = [
     { id: 'inventory' as const, label: 'Inventario', icon: Package },
@@ -325,7 +339,9 @@ export function StockPage() {
             </div>
             Stock
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5 ml-11">Control de inventario y lotes</p>
+          <p className="text-sm text-gray-500 mt-0.5 ml-11">
+            Inventario de <span className="font-medium text-gray-700">{selectedBranch?.name || 'la sucursal activa'}</span>
+          </p>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 scrollbar-hide">
           <button
@@ -354,7 +370,9 @@ export function StockPage() {
             <Package size={14} className="text-gray-300" />
           </div>
           <div className="text-2xl font-bold text-gray-800">{stockItems.length}</div>
-          <div className="text-xs text-gray-400 mt-0.5 truncate">{getCompanyName(companyId)}</div>
+          <div className="text-xs text-gray-400 mt-0.5 truncate">
+            {selectedBranch?.name || 'Sucursal'} · {getCompanyName(companyId)}
+          </div>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-card p-4">
           <div className="flex items-center justify-between mb-1">

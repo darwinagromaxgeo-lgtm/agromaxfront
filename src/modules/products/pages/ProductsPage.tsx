@@ -18,6 +18,7 @@ import { stockService } from '../../stock/services/stockService';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import type { Product } from '../../../shared/types';
+import { useAuth } from '../../../app/providers/AuthProvider';
 
 const TAX_TYPES = [
   { value: 'GRAVADO', label: 'Gravado (IGV 18%)' },
@@ -35,12 +36,13 @@ interface BulkProduct {
   activeIngredient: string;
   activeIngredients: { name: string; concentration: string }[];
   tracksLot: boolean;
-  prices: { priceTierId: string; companyId?: string; price: number }[];
+  prices: { priceTierId: string; companyId?: string; branchId?: string; price: number }[];
   initialStocks: { companyId: string; quantity: number }[];
   expanded: boolean;
 }
 
 export function ProductsPage() {
+  const { selectedBranch } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get('page') || '1');
   const activeTab = (searchParams.get('tab') || 'active') as 'active' | 'inactive';
@@ -89,10 +91,19 @@ export function ProductsPage() {
   const [editingLotId, setEditingLotId] = useState<string | null>(null);
   const [editingLotData, setEditingLotData] = useState<{ lotNumber: string; expirationDate: string }>({ lotNumber: '', expirationDate: '' });
 
+  const activeBranchCompanies = useMemo(
+    () => (Array.isArray(companies) ? companies : []).filter((company: any) =>
+      company.isActive
+      && (
+        !selectedBranch?.companyIds?.length
+        || selectedBranch.companyIds.includes(company.id)
+      ),
+    ),
+    [companies, selectedBranch],
+  );
+
   const stockQueries = useQueries({
-    queries: (Array.isArray(companies) ? companies : [])
-      .filter((c: any) => c.isActive)
-      .map((c: any) => ({
+    queries: activeBranchCompanies.map((c: any) => ({
         queryKey: ['stock', c.id, { limit: 9999 }],
         queryFn: () => stockService.getByCompany(c.id, { limit: 9999 }),
         staleTime: 60_000,
@@ -100,9 +111,8 @@ export function ProductsPage() {
   });
 
   const stockMap = useMemo(() => {
-    const activeCompanies = (Array.isArray(companies) ? companies : []).filter((c: any) => c.isActive);
     const map: Record<string, { companyId: string; quantity: number }[]> = {};
-    activeCompanies.forEach((c: any, i: number) => {
+    activeBranchCompanies.forEach((c: any, i: number) => {
       const q = stockQueries[i];
       if (!q?.data) return;
       const items: any[] = (q.data as any)?.data || [];
@@ -112,9 +122,9 @@ export function ProductsPage() {
       });
     });
     return map;
-  }, [companies, stockQueries]);
+  }, [activeBranchCompanies, stockQueries]);
 
-  const [form, setForm] = useState({ name: '', description: '', categoryId: '', unit: '', activeIngredient: '', activeIngredients: [] as { name: string; concentration: string }[], taxType: 'GRAVADO', tracksLot: false, location: '', supplier: '', control: '', cultivo: '', dosis: '', prices: [] as { priceTierId: string; companyId?: string; price: number }[], initialStocks: [] as { companyId: string; quantity: number }[] });
+  const [form, setForm] = useState({ name: '', description: '', categoryId: '', unit: '', activeIngredient: '', activeIngredients: [] as { name: string; concentration: string }[], taxType: 'GRAVADO', tracksLot: false, location: '', supplier: '', control: '', cultivo: '', dosis: '', prices: [] as { priceTierId: string; companyId?: string; branchId?: string; price: number }[], initialStocks: [] as { companyId: string; quantity: number }[] });
   const [selectedParentCatId, setSelectedParentCatId] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [suppliersTarget, setSuppliersTarget] = useState<Product | null>(null);
@@ -217,12 +227,22 @@ export function ProductsPage() {
     });
   };
 
-  const handlePriceChange = (tierId: string, price: number, companyId?: string) => {
+  const handlePriceChange = (tierId: string, price: number, companyId?: string, branchId?: string) => {
     setForm((prev) => {
       const prices = [...prev.prices];
-      const idx = prices.findIndex((p) => p.priceTierId === tierId && (p.companyId || undefined) === companyId);
-      if (idx >= 0) prices[idx] = { priceTierId: tierId, ...(companyId ? { companyId } : {}), price };
-      else prices.push({ priceTierId: tierId, ...(companyId ? { companyId } : {}), price });
+      const idx = prices.findIndex((p) =>
+        p.priceTierId === tierId
+        && (p.companyId || undefined) === companyId
+        && (p.branchId || undefined) === branchId,
+      );
+      const entry = {
+        priceTierId: tierId,
+        ...(companyId ? { companyId } : {}),
+        ...(branchId ? { branchId } : {}),
+        price,
+      };
+      if (idx >= 0) prices[idx] = entry;
+      else prices.push(entry);
       return { ...prev, prices };
     });
   };
@@ -321,12 +341,16 @@ export function ProductsPage() {
         };
 
         tiersList.forEach((t: any) => {
-          const globalPrice = p.prices?.find(pr => pr.priceTierId === t.id && !pr.companyId);
+          const globalPrice = p.prices?.find(pr =>
+            pr.priceTierId === t.id && !pr.companyId && !pr.branchId,
+          );
           row[`Precio_${t.name}`] = globalPrice?.price ?? '';
         });
         compsList.forEach((c: any) => {
           tiersList.forEach((t: any) => {
-            const companyPrice = p.prices?.find(pr => pr.priceTierId === t.id && pr.companyId === c.id);
+            const companyPrice = p.prices?.find(pr =>
+              pr.priceTierId === t.id && pr.companyId === c.id && !pr.branchId,
+            );
             row[`Precio_${c.name}_${t.name}`] = companyPrice?.price ?? '';
           });
         });
@@ -512,23 +536,39 @@ export function ProductsPage() {
   const tiers = Array.isArray(priceTiers) ? priceTiers : [];
   const cats = Array.isArray(categories) ? categories : [];
   const comps = Array.isArray(companies) ? companies : [];
+  const branchComps = activeBranchCompanies;
 
   const getPricesForDisplay = (product: Product) => {
-    if (!priceCompanyFilter) {
-      return product.prices?.filter(p => !p.companyId) || [];
-    }
     return tiers.map((t: any) => {
-      const companyPrice = product.prices?.find(p => p.priceTierId === t.id && p.companyId === priceCompanyFilter);
-      if (companyPrice) return companyPrice;
-      const globalPrice = product.prices?.find(p => p.priceTierId === t.id && !p.companyId);
-      return globalPrice || null;
+      const companyId = priceCompanyFilter || undefined;
+      return product.prices?.find(p =>
+        p.priceTierId === t.id
+        && p.branchId === selectedBranch?.id
+        && p.companyId === companyId,
+      )
+        || product.prices?.find(p =>
+          p.priceTierId === t.id
+          && p.branchId === selectedBranch?.id
+          && !p.companyId,
+        )
+        || (companyId ? product.prices?.find(p =>
+          p.priceTierId === t.id
+          && p.companyId === companyId
+          && !p.branchId,
+        ) : undefined)
+        || product.prices?.find(p =>
+          p.priceTierId === t.id
+          && !p.companyId
+          && !p.branchId,
+        )
+        || null;
     }).filter(Boolean) as typeof product.prices;
   };
 
   const columns = [
     { key: 'name', header: 'Nombre', render: (item: Product) => {
       const itemStocks = stockMap[item.id] || [];
-      const activeCompsList = comps.filter((c: any) => c.isActive);
+      const activeCompsList = branchComps;
       return (
         <div>
           <span className="block max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap" title={item.name}>{item.name}</span>
@@ -592,11 +632,11 @@ export function ProductsPage() {
         <div className="text-xs space-y-1">
           {displayPrices.map((p) => {
             const tier = tiers.find((t: any) => t.id === p.priceTierId);
-            const isCompanySpecific = !!p.companyId;
+            const isBranchSpecific = p.branchId === selectedBranch?.id;
             return (
-              <div key={`${p.priceTierId}-${p.companyId || 'global'}`}>
+              <div key={`${p.priceTierId}-${p.companyId || 'global'}-${p.branchId || 'base'}`}>
                 <span className="font-medium">{tier?.name || 'N/A'}:</span> S/ {p.price.toFixed(2)}
-                {priceCompanyFilter && !isCompanySpecific && <span className="text-gray-400 ml-1">(global)</span>}
+                {!isBranchSpecific && <span className="text-gray-400 ml-1">(base)</span>}
               </div>
             );
           })}
@@ -694,10 +734,10 @@ export function ProductsPage() {
                 {allUnits.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
               </select>
             )}
-            {comps.length > 0 && (
+            {branchComps.length > 0 && (
               <select value={priceCompanyFilter} onChange={(e) => setPriceCompanyFilter(e.target.value)} className="flex-1 min-w-0 px-3 py-2 border rounded-lg text-sm">
-                <option value="">Precio global</option>
-                {comps.filter((c: any) => c.isActive).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="">Precio base</option>
+                {branchComps.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
           </div>
@@ -730,7 +770,7 @@ export function ProductsPage() {
                 <div>
                   <span className="font-semibold text-gray-800 leading-snug">{item.name}</span>
                   {(() => {
-                    const activeCompsList = comps.filter((c: any) => c.isActive);
+                    const activeCompsList = branchComps;
                     if (!activeCompsList.length) return null;
                     const itemStocks = stockMap[item.id] || [];
                     return (
@@ -787,9 +827,9 @@ export function ProductsPage() {
                   {displayPrices.map(p => {
                     const tier = tiers.find((t: any) => t.id === p.priceTierId);
                     return (
-                      <span key={`${p.priceTierId}-${p.companyId || 'g'}`}>
+                      <span key={`${p.priceTierId}-${p.companyId || 'g'}-${p.branchId || 'base'}`}>
                         <span className="font-medium">{tier?.name}:</span> S/ {p.price.toFixed(2)}
-                        {priceCompanyFilter && !p.companyId && <span className="text-gray-400"> (global)</span>}
+                        {p.branchId !== selectedBranch?.id && <span className="text-gray-400"> (base)</span>}
                       </span>
                     );
                   })}
@@ -946,12 +986,12 @@ export function ProductsPage() {
             </div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Tipo IGV</label><select value={form.taxType} onChange={(e) => setForm({ ...form, taxType: e.target.value })} className="w-full px-3 py-2 border rounded-lg">{TAX_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
           </div>
-          {!editing && comps.length > 0 && (
+          {!editing && branchComps.length > 0 && (
             <div className="border border-blue-200 bg-blue-50 rounded-lg p-4 space-y-3">
-              <label className="block text-sm font-medium text-blue-800">Stock Inicial por Empresa (opcional)</label>
-              <p className="text-xs text-blue-600">Si ya tienes existencias de este producto, ingresa la cantidad por cada empresa.</p>
+              <label className="block text-sm font-medium text-blue-800">Stock inicial en {selectedBranch?.name || 'la sucursal actual'} (opcional)</label>
+              <p className="text-xs text-blue-600">Estas cantidades solo se cargarán en la sucursal seleccionada.</p>
               <div className="space-y-2">
-                {comps.filter((c: any) => c.isActive).map((c: any) => (
+                {branchComps.map((c: any) => (
                   <div key={c.id} className="flex items-center gap-3">
                     <span className="text-sm w-40 truncate font-medium">{c.name}</span>
                     <input type="number" step="0.01" min="0" placeholder="0" value={form.initialStocks.find(s => s.companyId === c.id)?.quantity || ''} onChange={(e) => handleStockChange(c.id, parseFloat(e.target.value) || 0)} className="flex-1 px-3 py-2 border rounded-lg" />
@@ -970,23 +1010,42 @@ export function ProductsPage() {
 
           {tiers.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Precio por defecto <span className="text-xs font-normal text-gray-400">(se usa cuando no hay precio específico por empresa)</span></label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Precio base <span className="text-xs font-normal text-gray-400">(respaldo cuando una sucursal no tiene precio propio)</span></label>
               <div className="space-y-2">
                 {tiers.map((tier: any) => (
                   <div key={tier.id} className="flex items-center gap-3">
                     <span className="text-sm w-32">{tier.name}</span>
-                    <input type="number" step="0.01" min="0" placeholder="0.00" value={form.prices.find((p) => p.priceTierId === tier.id && !p.companyId)?.price || ''} onChange={(e) => handlePriceChange(tier.id, parseFloat(e.target.value) || 0)} className="flex-1 px-3 py-2 border rounded-lg" />
+                    <input type="number" step="0.01" min="0" placeholder="0.00" value={form.prices.find((p) => p.priceTierId === tier.id && !p.companyId && !p.branchId)?.price || ''} onChange={(e) => handlePriceChange(tier.id, parseFloat(e.target.value) || 0)} className="flex-1 px-3 py-2 border rounded-lg" />
                   </div>
                 ))}
               </div>
-              {comps.filter((c: any) => c.isActive).map((company: any) => (
-                <div key={company.id} className="mt-4 border border-orange-200 bg-orange-50 rounded-lg p-3">
-                  <label className="block text-sm font-medium text-orange-800 mb-2">Precios para {company.name} (opcional)</label>
+              {branchComps.map((company: any) => (
+                <div key={company.id} className="mt-4 border border-primary-200 bg-primary-50 rounded-lg p-3">
+                  <label className="block text-sm font-medium text-primary-800 mb-2">
+                    {selectedBranch?.name || 'Sucursal actual'} · {company.name}
+                  </label>
                   <div className="space-y-2">
                     {tiers.map((tier: any) => (
                       <div key={tier.id} className="flex items-center gap-3">
                         <span className="text-sm w-32">{tier.name}</span>
-                        <input type="number" step="0.01" min="0" placeholder={`Global: ${form.prices.find((p: any) => p.priceTierId === tier.id && !p.companyId)?.price || '0.00'}`} value={form.prices.find((p: any) => p.priceTierId === tier.id && p.companyId === company.id)?.price || ''} onChange={(e) => handlePriceChange(tier.id, parseFloat(e.target.value) || 0, company.id)} className="flex-1 px-3 py-2 border rounded-lg" />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder={`Base: ${form.prices.find((p: any) => p.priceTierId === tier.id && !p.companyId && !p.branchId)?.price || '0.00'}`}
+                          value={form.prices.find((p: any) =>
+                            p.priceTierId === tier.id
+                            && p.companyId === company.id
+                            && p.branchId === selectedBranch?.id,
+                          )?.price || ''}
+                          onChange={(e) => handlePriceChange(
+                            tier.id,
+                            parseFloat(e.target.value) || 0,
+                            company.id,
+                            selectedBranch?.id,
+                          )}
+                          className="flex-1 px-3 py-2 border rounded-lg"
+                        />
                       </div>
                     ))}
                   </div>
@@ -1024,7 +1083,7 @@ export function ProductsPage() {
                   <label className="block text-xs font-medium text-gray-600 mb-1">Empresa *</label>
                   <select value={lotForm.companyId} onChange={e => setLotForm(f => ({ ...f, companyId: e.target.value }))} className="w-full px-3 py-2 border rounded-lg text-sm">
                     <option value="">Seleccionar...</option>
-                    {comps.filter((c: any) => c.isActive).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {branchComps.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1234,9 +1293,9 @@ export function ProductsPage() {
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Unidad</label><select value={bp.unit} onChange={(e) => updateBulkProduct(idx, 'unit', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm">{allUnits.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}</select></div>
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Tipo IGV</label><select value={bp.taxType} onChange={(e) => updateBulkProduct(idx, 'taxType', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm">{TAX_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
                   </div>
-                  {comps.length > 0 && (
+                  {branchComps.length > 0 && (
                     <div><label className="block text-sm font-medium text-gray-700 mb-2">Stock Inicial por Empresa</label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{comps.filter((c: any) => c.isActive).map((c: any) => (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">{branchComps.map((c: any) => (
                         <div key={c.id} className="flex items-center gap-2">
                           <span className="text-xs w-20 truncate">{c.name}</span>
                           <input type="number" step="0.01" min="0" placeholder="0" value={bp.initialStocks.find(s => s.companyId === c.id)?.quantity || ''} onChange={(e) => updateBulkStock(idx, c.id, parseFloat(e.target.value) || 0)} className="flex-1 px-2 py-1.5 border rounded-lg text-sm" />

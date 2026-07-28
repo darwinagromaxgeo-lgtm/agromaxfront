@@ -139,9 +139,13 @@ export function SalesPage() {
     if (branchCompany) return branchCompany.price;
     const branchGlobal = product.prices.find((p: ProductPrice) => p.priceTierId === tierId && p.branchId === selectedBranch?.id && !p.companyId);
     if (branchGlobal) return branchGlobal.price;
-    const companyPrice = product.prices.find((p: ProductPrice) => p.priceTierId === tierId && p.companyId === companyId);
+    const companyPrice = product.prices.find((p: ProductPrice) =>
+      p.priceTierId === tierId && p.companyId === companyId && !p.branchId,
+    );
     if (companyPrice) return companyPrice.price;
-    const globalPrice = product.prices.find((p: ProductPrice) => p.priceTierId === tierId && !p.companyId);
+    const globalPrice = product.prices.find((p: ProductPrice) =>
+      p.priceTierId === tierId && !p.companyId && !p.branchId,
+    );
     return globalPrice?.price;
   };
 
@@ -273,7 +277,10 @@ export function SalesPage() {
     setReturningLoan(null);
   };
 
-  const companyList = Array.isArray(companies) ? companies : [];
+  const companyList = (Array.isArray(companies) ? companies : []).filter((company: Company) => {
+    const allowedIds = selectedBranch?.companyIds || [];
+    return company.isActive && (allowedIds.length === 0 || allowedIds.includes(company.id));
+  });
   const products = productsData?.data || [];
   const clients = clientsData?.data || [];
   const tiers = Array.isArray(priceTiers) ? priceTiers : [];

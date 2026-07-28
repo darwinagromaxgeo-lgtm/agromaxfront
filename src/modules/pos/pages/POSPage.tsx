@@ -59,9 +59,13 @@ function resolvePrice(product: Product, tierId: string, companyId: string, branc
   if (branchCompany) return branchCompany.price;
   const branchGlobal = product.prices.find((p: ProductPrice) => p.priceTierId === tierId && p.branchId === branchId && !p.companyId);
   if (branchGlobal) return branchGlobal.price;
-  const byCompany = product.prices.find((p: ProductPrice) => p.priceTierId === tierId && p.companyId === companyId);
+  const byCompany = product.prices.find((p: ProductPrice) =>
+    p.priceTierId === tierId && p.companyId === companyId && !p.branchId,
+  );
   if (byCompany) return byCompany.price;
-  const global = product.prices.find((p: ProductPrice) => p.priceTierId === tierId && !p.companyId);
+  const global = product.prices.find((p: ProductPrice) =>
+    p.priceTierId === tierId && !p.companyId && !p.branchId,
+  );
   return global?.price;
 }
 
@@ -146,8 +150,12 @@ export function POSPage() {
 
   const companies: Company[] = useMemo(() => {
     const list: Company[] = Array.isArray(companiesData) ? companiesData : [];
-    return list.filter((c) => c.isActive);
-  }, [companiesData]);
+    const allowedIds = selectedBranch?.companyIds || [];
+    return list.filter((company) =>
+      company.isActive
+      && (allowedIds.length === 0 || allowedIds.includes(company.id)),
+    );
+  }, [companiesData, selectedBranch]);
 
   const clients: Client[] = useMemo(() => {
     const raw: any = clientsData;

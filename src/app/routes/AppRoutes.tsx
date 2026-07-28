@@ -11,6 +11,7 @@ const PurchaseDetailPage = lazy(() => import('../../modules/purchases/pages/Purc
 const PurchaseEditPage = lazy(() => import('../../modules/purchases/pages/PurchaseEditPage').then(m => ({ default: m.PurchaseEditPage })));
 const SalesPage = lazy(() => import('../../modules/sales/pages/SalesPage').then(m => ({ default: m.SalesPage })));
 const StockPage = lazy(() => import('../../modules/stock/pages/StockPage').then(m => ({ default: m.StockPage })));
+const StockRequestsPage = lazy(() => import('../../modules/stock-requests/pages/StockRequestsPage').then(m => ({ default: m.StockRequestsPage })));
 const ClientsPage = lazy(() => import('../../modules/clients/pages/ClientsPage').then(m => ({ default: m.ClientsPage })));
 const CompaniesPage = lazy(() => import('../../modules/companies/pages/CompaniesPage').then(m => ({ default: m.CompaniesPage })));
 const PriceTiersPage = lazy(() => import('../../modules/price-tiers/pages/PriceTiersPage').then(m => ({ default: m.PriceTiersPage })));
@@ -51,6 +52,7 @@ export function AppRoutes() {
         <Route path="quotes" element={<Suspense fallback={<Loading />}><QuotesPage /></Suspense>} />
         <Route path="sales" element={<Suspense fallback={<Loading />}><SalesPage /></Suspense>} />
         <Route path="stock" element={<Suspense fallback={<Loading />}><StockPage /></Suspense>} />
+        <Route path="stock-requests" element={<Suspense fallback={<Loading />}><StockRequestsPage /></Suspense>} />
         <Route path="cash-register" element={<Suspense fallback={<Loading />}><CashRegisterPage /></Suspense>} />
         <Route path="cash-register/history" element={<Suspense fallback={<Loading />}><CashRegisterHistoryPage /></Suspense>} />
         <Route path="credits" element={<Suspense fallback={<Loading />}><CreditsPage /></Suspense>} />

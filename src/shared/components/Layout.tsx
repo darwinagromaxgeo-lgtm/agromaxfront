@@ -7,6 +7,7 @@ import {
   Package, ShoppingCart, TrendingUp, TrendingDown, Users, Building2, Layers, ArrowLeftRight,
   LogOut, Menu, X, Wallet, CreditCard, BarChart3, FolderTree, Shield,
   ClipboardList, FileText, Bell, AlertTriangle, Clock, ScanLine, Ruler, ScrollText, Receipt, LayoutGrid,
+  PackageSearch,
 } from 'lucide-react';
 import type { AccountPayable } from '../types';
 
@@ -34,6 +35,7 @@ const navSections: NavSection[] = [
       { path: '/purchases', label: 'Compras', icon: TrendingUp },
       { path: '/sales', label: 'Ventas', icon: ShoppingCart },
       { path: '/stock', label: 'Stock', icon: ArrowLeftRight },
+      { path: '/stock-requests', label: 'Entre Sucursales', icon: PackageSearch },
       { path: '/kardex', label: 'Kardex', icon: ClipboardList },
     ],
   },
