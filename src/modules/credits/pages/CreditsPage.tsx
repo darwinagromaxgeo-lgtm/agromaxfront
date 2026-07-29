@@ -12,6 +12,7 @@ import { CreditCard, DollarSign, Edit2, Trash2, ChevronDown, ChevronRight, Searc
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import type { CreditAccount, Client } from '../../../shared/types';
+import { useAuth } from '../../../app/providers/AuthProvider';
 
 type Status = 'PENDING' | 'PARTIAL' | 'PAID';
 const STATUS_RANK: Record<Status, number> = { PENDING: 3, PARTIAL: 2, PAID: 1 };
@@ -35,6 +36,7 @@ const statusLabels: Record<Status, { label: string; class: string }> = {
 const PAGE_SIZE = 10;
 
 export function CreditsPage() {
+  const { selectedBranch } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'' | Status>('');
@@ -159,9 +161,14 @@ export function CreditsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <CreditCard size={24} /> Créditos
-        </h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <CreditCard size={24} /> Créditos
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Cuentas por cobrar de <span className="font-medium text-gray-700">{selectedBranch?.name || 'la sucursal activa'}</span>
+          </p>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap gap-3 items-center">

@@ -65,7 +65,7 @@ export interface StockRequest {
   createdAt?: string;
   updatedAt?: string;
 }
-export interface Client { id: string; name: string; documentNumber?: string; phone?: string; email?: string; address?: string; isActive: boolean; }
+export interface Client { id: string; branchId: string; name: string; documentNumber?: string; phone?: string; email?: string; address?: string; isActive: boolean; }
 
 export interface PaymentMethod { id: string; name: string; isActive: boolean; }
 export interface SalePayment { paymentMethodId: string; paymentMethodName: string; amount: number; }
@@ -105,7 +105,7 @@ export interface CashRegister { id: string; date: string; openingBalance: number
 
 export interface CreditPayment { id: string; amount: number; paymentDate: string; paymentMethodId?: string; paymentMethodName?: string; cashRegisterEntryId?: string; notes?: string; receivedBy?: string; receivedByName?: string; paymentGroupId?: string; }
 export interface CreditSaleDetail { saleId: string; date: string; total: number; items: { productId: string; productName: string; companyId: string; companyName: string; priceTier?: string; quantity: number; unitPrice: number; subtotal: number; }[]; }
-export interface CreditAccount { id: string; clientId: string; name?: string; saleIds: string[]; saleDetails?: CreditSaleDetail[]; totalAmount: number; paidAmount: number; pendingAmount: number; status: 'PENDING' | 'PARTIAL' | 'PAID'; payments: CreditPayment[]; createdBy?: string; createdAt: string; }
+export interface CreditAccount { id: string; branchId: string; clientId: string; name?: string; saleIds: string[]; saleDetails?: CreditSaleDetail[]; totalAmount: number; paidAmount: number; pendingAmount: number; status: 'PENDING' | 'PARTIAL' | 'PAID'; payments: CreditPayment[]; createdBy?: string; createdAt: string; }
 
 export interface LoanItem { productId: string; productName?: string; companyId: string; companyName?: string; quantity: number; returnedQuantity: number; }
 export interface LoanReturnItem { productId: string; productName?: string; companyId: string; companyName?: string; quantity: number; }

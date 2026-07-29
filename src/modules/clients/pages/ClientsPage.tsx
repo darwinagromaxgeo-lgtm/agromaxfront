@@ -10,8 +10,10 @@ import type { Client } from '../../../shared/types';
 import { clientService } from '../services/clientService';
 import { ExportClientStatementButton } from '../../credits/components/ExportClientStatementButton';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../../app/providers/AuthProvider';
 
 export function ClientsPage() {
+  const { selectedBranch } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search);
@@ -108,7 +110,12 @@ export function ClientsPage() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Users size={24} /> Clientes</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Users size={24} /> Clientes</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Cartera de <span className="font-medium text-gray-700">{selectedBranch?.name || 'la sucursal activa'}</span>
+          </p>
+        </div>
         <button onClick={openCreate} className="flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"><Plus size={18} /> Nuevo Cliente</button>
       </div>
       <div className="mb-4 relative">
