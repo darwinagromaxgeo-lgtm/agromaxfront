@@ -1,10 +1,11 @@
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import type { CreditAccount, Client } from '../../../shared/types';
+import { pdfBrandFooter } from '../../../shared/branding/pdfBrand';
 
-(pdfMake as any).vfs = (pdfFonts as any).vfs || (pdfFonts as any).pdfMake?.vfs;
+(pdfMake as any).addVirtualFileSystem((pdfFonts as any).vfs || (pdfFonts as any).pdfMake?.vfs || pdfFonts);
 
-const BRAND = '#16a34a';
+const BRAND = '#08883d';
 const BRAND_LIGHT = '#dcfce7';
 const BORDER = '#94a3b8';
 const GRAY = '#6b7280';
@@ -111,7 +112,7 @@ function summaryCards(credits: CreditAccount[]) {
   };
 }
 
-function buildSummaryByDate({ credits, clients, filters, title, subtitle }: ExportParams) {
+export function buildSummaryByDate({ credits, clients, filters, title, subtitle }: ExportParams) {
   const clientById = new Map(clients.map((c) => [c.id, c]));
   const getClientName = (id: string) => clientById.get(id)?.name || 'N/A';
 
@@ -197,7 +198,7 @@ function buildSummaryByDate({ credits, clients, filters, title, subtitle }: Expo
 
   return {
     pageSize: 'A4',
-    pageMargins: [30, 30, 30, 30],
+    pageMargins: [30, 30, 30, 40],
     content: [
       ...baseHeader(title || 'Reporte de Créditos — Resumen por fecha', filters, subtitle),
       summaryCards(credits),
@@ -214,17 +215,11 @@ function buildSummaryByDate({ credits, clients, filters, title, subtitle }: Expo
       cardValueRed: { fontSize: 11, bold: true, alignment: 'center', color: '#dc2626', margin: [0, 3] },
     },
     defaultStyle: { fontSize: 9 },
-    footer: (currentPage: number, pageCount: number) => ({
-      text: `${currentPage} / ${pageCount}`,
-      alignment: 'center',
-      fontSize: 8,
-      color: GRAY,
-      margin: [0, 10],
-    }),
+    footer: (currentPage: number, pageCount: number) => pdfBrandFooter(currentPage, pageCount),
   };
 }
 
-function buildDetailed({ credits, clients, filters, title, subtitle }: ExportParams) {
+export function buildDetailed({ credits, clients, filters, title, subtitle }: ExportParams) {
   const clientById = new Map(clients.map((c) => [c.id, c]));
 
   // Agrupar por cliente
@@ -406,7 +401,7 @@ function buildDetailed({ credits, clients, filters, title, subtitle }: ExportPar
 
   return {
     pageSize: 'A4',
-    pageMargins: [30, 30, 30, 30],
+    pageMargins: [30, 30, 30, 40],
     content: [
       ...baseHeader(title || 'Reporte de Créditos — Detallado', filters, subtitle),
       summaryCards(credits),
@@ -424,13 +419,7 @@ function buildDetailed({ credits, clients, filters, title, subtitle }: ExportPar
       cardValueRed: { fontSize: 11, bold: true, alignment: 'center', color: '#dc2626', margin: [0, 3] },
     },
     defaultStyle: { fontSize: 9 },
-    footer: (currentPage: number, pageCount: number) => ({
-      text: `${currentPage} / ${pageCount}`,
-      alignment: 'center',
-      fontSize: 8,
-      color: GRAY,
-      margin: [0, 10],
-    }),
+    footer: (currentPage: number, pageCount: number) => pdfBrandFooter(currentPage, pageCount),
   };
 }
 

@@ -1,20 +1,38 @@
 {
-  "name": "Agrosystem",
-  "short_name": "Agrosystem",
-  "description": "Gestion de ventas, inventario y caja para tiendas agropecuarias",
+  "name": "Agromax",
+  "short_name": "Agromax",
+  "description": "Gestión de ventas, inventario, caja y facturación para negocios agrícolas",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f9fafb",
-  "theme_color": "#16a34a",
+  "background_color": "#f7f7ef",
+  "theme_color": "#08883d",
   "lang": "es-PE",
   "icons": [
     {
-      "src": "/Icon/logosin.png",
-      "sizes": "500x500",
+      "src": "/brand/agromax-icon-192.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/agromax-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/agromax-icon-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/brand/agromax-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "shortcuts": [
@@ -22,13 +40,26 @@
       "name": "Nueva venta",
       "short_name": "POS",
       "url": "/pos",
-      "icons": [{ "src": "/Icon/logosin.png", "sizes": "500x500", "type": "image/png" }]
+      "icons": [
+        {
+          "src": "/brand/agromax-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Stock",
       "short_name": "Stock",
       "url": "/stock",
-      "icons": [{ "src": "/Icon/logosin.png", "sizes": "500x500", "type": "image/png" }]
+      "icons": [
+        {
+          "src": "/brand/agromax-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
-  ]
+  ],
+  "id": "/dashboard"
 }

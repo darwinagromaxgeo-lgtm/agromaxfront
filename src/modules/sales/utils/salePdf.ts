@@ -1,11 +1,12 @@
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import type { Client, Company, Product, Sale } from '../../../shared/types';
+import { pdfBrandFooter } from '../../../shared/branding/pdfBrand';
 
-(pdfMake as any).vfs = (pdfFonts as any).vfs || (pdfFonts as any).pdfMake?.vfs;
+(pdfMake as any).addVirtualFileSystem((pdfFonts as any).vfs || (pdfFonts as any).pdfMake?.vfs || pdfFonts);
 
-const BRAND_GREEN = '#16a34a';
-const BRAND_GREEN_DARK = '#166534';
+const BRAND_GREEN = '#08883d';
+const BRAND_GREEN_DARK = '#183d2b';
 const LIGHT_GREEN = '#f0fdf4';
 const BORDER_GRAY = '#cbd5e1';
 
@@ -30,7 +31,7 @@ const getDocumentLabel = (voucherType: string) => {
   return 'NOTA DE VENTA';
 };
 
-function buildDocDefinition({ sale, companies, client, products }: SalePdfParams) {
+export function buildDocDefinition({ sale, companies, client, products }: SalePdfParams) {
   const companyById = new Map(companies.map((company) => [company.id, company]));
   const productById = new Map(products.map((product) => [product.id, product]));
   const itemCompanyIds = [...new Set(sale.items.map((item) => item.companyId))];
@@ -81,7 +82,7 @@ function buildDocDefinition({ sale, companies, client, products }: SalePdfParams
           {
             width: '*',
             stack: [
-              { text: issuer?.name || (hasMultipleIssuers ? 'VENTA MULTIEMPRESA' : 'AGROSYSTEM'), fontSize: 17, bold: true, color: BRAND_GREEN_DARK },
+              { text: issuer?.name || (hasMultipleIssuers ? 'VENTA MULTIEMPRESA' : 'AGROMAX'), fontSize: 17, bold: true, color: BRAND_GREEN_DARK },
               { text: issuer?.ruc ? `RUC ${issuer.ruc}` : 'Documento interno del sistema', margin: [0, 3, 0, 0] },
               ...(issuer?.address ? [{ text: issuer.address, color: '#64748b', margin: [0, 2, 0, 0] }] : []),
               ...(issuer?.phone ? [{ text: `Tel. ${issuer.phone}`, color: '#64748b', margin: [0, 2, 0, 0] }] : []),
@@ -213,13 +214,7 @@ function buildDocDefinition({ sale, companies, client, products }: SalePdfParams
         margin: [0, 16, 0, 0],
       },
     ],
-    footer: (currentPage: number, pageCount: number) => ({
-      columns: [
-        { text: 'Generado por Agrosystem', color: '#94a3b8', fontSize: 7 },
-        { text: `Página ${currentPage} de ${pageCount}`, alignment: 'right', color: '#94a3b8', fontSize: 7 },
-      ],
-      margin: [36, 0, 36, 0],
-    }),
+    footer: (currentPage: number, pageCount: number) => pdfBrandFooter(currentPage, pageCount, 36),
     styles: {
       tableHeader: { bold: true, color: 'white', fontSize: 8 },
     },

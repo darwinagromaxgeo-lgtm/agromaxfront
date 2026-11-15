@@ -2,8 +2,9 @@ import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import type { Quote, Product, Company, Client } from '../../../shared/types';
 import { numberToWords } from './numberToWords';
+import { pdfBrandFooter } from '../../../shared/branding/pdfBrand';
 
-(pdfMake as any).vfs = (pdfFonts as any).vfs || (pdfFonts as any).pdfMake?.vfs;
+(pdfMake as any).addVirtualFileSystem((pdfFonts as any).vfs || (pdfFonts as any).pdfMake?.vfs || pdfFonts);
 
 interface GenerateParams {
   quote: Quote;
@@ -20,7 +21,7 @@ const formatDate = (d?: string | Date) => {
 };
 
 const IGV_RATE = 0.18;
-const BRAND_GREEN = '#16a34a';
+const BRAND_GREEN = '#08883d';
 const BORDER_GRAY = '#94a3b8';
 
 function labeledCell(label: string, value: string) {
@@ -31,7 +32,7 @@ function labeledCell(label: string, value: string) {
   ];
 }
 
-function buildDocDefinition({ quote, products, company, client, vendor, currency = 'PEN' }: GenerateParams) {
+export function buildDocDefinition({ quote, products, company, client, vendor, currency = 'PEN' }: GenerateParams) {
   const getProduct = (id: string) => products.find(p => p.id === id);
   const currencySymbol = currency === 'USD' ? 'US$' : 'S/';
 
@@ -60,7 +61,8 @@ function buildDocDefinition({ quote, products, company, client, vendor, currency
 
   return {
     pageSize: 'A4',
-    pageMargins: [30, 30, 30, 30],
+    pageMargins: [30, 30, 30, 40],
+    footer: (currentPage: number, pageCount: number) => pdfBrandFooter(currentPage, pageCount),
     content: [
       // ===== HEADER =====
       {

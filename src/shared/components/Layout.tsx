@@ -10,6 +10,7 @@ import {
   PackageSearch,
 } from 'lucide-react';
 import type { AccountPayable } from '../types';
+import { BrandLogo } from './BrandLogo';
 
 type NavItem = { path: string; label: string; icon: any; roles?: string[] };
 type NavSection = { label: string; items: NavItem[] };
@@ -156,7 +157,9 @@ export function Layout() {
         }`}
       >
         <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100">
-          <h1 className="text-base font-bold text-gray-800">Agrosystem</h1>
+          <Link to="/dashboard" aria-label="Agromax — Inicio" onClick={() => setSidebarOpen(false)}>
+            <BrandLogo variant="compact" decorative className="h-11 w-auto max-w-[180px]" />
+          </Link>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-500">
             <X size={20} />
           </button>
@@ -247,6 +250,10 @@ export function Layout() {
             <button onClick={() => setSidebarOpen(true)} className="hidden">
               <Menu size={20} />
             </button>
+            <Link to="/dashboard" className="lg:hidden flex items-center gap-2" aria-label="Agromax — Inicio">
+              <BrandLogo variant="icon" decorative className="h-9 w-9 rounded-lg" />
+              <span className="hidden min-[390px]:inline text-sm font-bold text-white">Agromax</span>
+            </Link>
           </div>
 
           <div className="flex items-center gap-3">
@@ -380,7 +387,7 @@ export function Layout() {
                       className={`absolute -top-5 flex flex-col items-center justify-center w-14 h-14 rounded-full transition-all duration-200 active:scale-95 ${
                         isActive
                           ? 'bg-primary-700 shadow-[0_4px_18px_rgba(22,163,74,0.55)]'
-                          : 'bg-primary-600 shadow-[0_4px_18px_rgba(22,163,74,0.40)]'
+                          : 'bg-primary-600 shadow-[0_4px_18px_rgba(8,136,61,0.35)]'
                       }`}
                     >
                       <Icon size={22} strokeWidth={2} className="text-white" />

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from '../../modules/auth/pages/LoginPage';
 import { ProtectedRoute } from '../../modules/auth/components/ProtectedRoute';
 import { Layout } from '../../shared/components/Layout';
+import { AppLoading } from '../../shared/components/AppLoading';
 
 const ProductsPage = lazy(() => import('../../modules/products/pages/ProductsPage').then(m => ({ default: m.ProductsPage })));
 const PurchasesPage = lazy(() => import('../../modules/purchases/pages/PurchasesPage').then(m => ({ default: m.PurchasesPage })));
@@ -33,7 +34,7 @@ const QuotesPage = lazy(() => import('../../modules/quotes/pages/QuotesPage').th
 const InvoicesPage = lazy(() => import('../../modules/invoices/pages/InvoicesPage').then(m => ({ default: m.InvoicesPage })));
 const BranchesPage = lazy(() => import('../../modules/branches/pages/BranchesPage').then(m => ({ default: m.BranchesPage })));
 
-const Loading = () => <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" /></div>;
+const Loading = AppLoading;
 
 export function AppRoutes() {
   return (

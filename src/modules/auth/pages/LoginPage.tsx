@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Leaf, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
+import { BrandLogo } from '../../../shared/components/BrandLogo';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -31,39 +32,34 @@ export function LoginPage() {
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-primary-50 via-white to-primary-100">
       {/* Left panel - branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-primary-600 to-primary-800 text-white p-12 flex-col justify-between overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-primary-600 to-primary-700 text-white p-12 flex-col justify-between overflow-hidden">
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10 rounded-full" />
         <div className="absolute -bottom-32 -left-16 w-80 h-80 bg-white/5 rounded-full" />
 
-        <div className="relative flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur flex items-center justify-center">
-            <Leaf size={24} />
-          </div>
-          <span className="text-xl font-bold">Agrosystem</span>
+        <div className="relative w-full max-w-md rounded-2xl bg-white px-6 py-5 shadow-lg">
+          <BrandLogo variant="horizontal" className="h-auto w-full" />
+          <div className="mt-3 h-1 w-14 rounded-full bg-accent-600" />
         </div>
 
         <div className="relative">
           <h2 className="text-4xl font-bold leading-tight mb-4">
             Gestiona tu negocio<br />agrícola con confianza
           </h2>
-          <p className="text-primary-100 text-base max-w-md">
+          <p className="text-white text-base max-w-md">
             Control de ventas, inventario y cartera en una sola plataforma diseñada para distribuidoras de agroquímicos.
           </p>
         </div>
 
-        <div className="relative text-sm text-primary-100">
-          © {new Date().getFullYear()} Agrosystem. Todos los derechos reservados.
+        <div className="relative text-sm text-white">
+          © {new Date().getFullYear()} Agromax. Todos los derechos reservados.
         </div>
       </div>
 
       {/* Right panel - form */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center">
-              <Leaf size={24} />
-            </div>
-            <span className="text-xl font-bold text-gray-800">Agrosystem</span>
+          <div className="lg:hidden mb-10 mx-auto w-full max-w-sm">
+            <BrandLogo variant="horizontal" className="h-auto w-full" />
           </div>
 
           <div className="mb-8">
