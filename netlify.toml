@@ -2,6 +2,9 @@
   command = "npm run build"
   publish = "dist"
 
+[context.production.environment]
+  VITE_API_URL = "https://agromaxback.onrender.com/api"
+
 [[headers]]
   for = "/sw.js"
   [headers.values]
