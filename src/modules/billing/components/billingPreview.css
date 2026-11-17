@@ -39,28 +39,35 @@
 .billing-sheet-footer .billing-sheet-notice { color: #936022; font-size: 11px; font-weight: 700; margin-bottom: 14px; }
 .billing-sheet-footer .billing-sheet-thanks { font-size: 13px; font-weight: 700; color: #42614d; margin: 15px 0 3px; }
 .billing-sheet-hash { overflow-wrap: anywhere; margin-top: 8px !important; }
-.billing-sheet-ticket { width: 302px; padding: 25px 17px; min-height: 540px; font-size: 11px; }
-.billing-sheet-ticket .billing-sheet-header { display: block; text-align: center; border: 0; padding-bottom: 12px; }
-.billing-sheet-ticket .billing-sheet-logo { width: 190px; margin: 0 auto 16px; }
-.billing-sheet-ticket h3 { font-size: 15px; }
-.billing-sheet-ticket .billing-sheet-brand p { font-size: 10px; }
-.billing-sheet-ticket .billing-sheet-reference { max-width: none; border: 0; border-top: 1px dashed #b8c6bc; border-bottom: 1px dashed #b8c6bc; border-radius: 0; padding: 17px 0; margin: 17px 0 0; background: transparent; }
-.billing-sheet-ticket .billing-sheet-reference p { font-size: 10px; }
-.billing-sheet-ticket .billing-sheet-reference strong { font-size: 18px; margin: 6px 0; }
-.billing-sheet-ticket .billing-sheet-reference span { font-size: 8px; }
-.billing-sheet-ticket .billing-sheet-customer { display: block; margin: 7px 0 19px; }
-.billing-sheet-ticket .billing-sheet-customer strong { font-size: 12px; }
-.billing-sheet-ticket .billing-sheet-customer p { font-size: 10px; }
-.billing-sheet-ticket .billing-sheet-meta { border-top: 1px dashed #d7e0da; padding-top: 10px; margin-top: 12px; }
-.billing-sheet-ticket .billing-sheet-items { font-size: 10px; }
-.billing-sheet-ticket .billing-sheet-items th { font-size: 8px; background: transparent; padding: 10px 0; border-top: 1px dashed #b8c6bc; border-bottom: 1px dashed #b8c6bc; }
-.billing-sheet-ticket .billing-sheet-items td { padding: 12px 0; }
-.billing-sheet-ticket .billing-sheet-items td:first-child { width: 70%; padding-right: 10px; }
+.billing-sheet-ticket { width: 302px; min-height: 0; padding: 8px 14px 12px; font-size: 14px; line-height: 1.35; color: #000; font-weight: 700; font-variant-numeric: tabular-nums; }
+.billing-sheet.billing-sheet-ticket * { color: #000; font-weight: 700; }
+.billing-sheet-ticket .billing-sheet-header { display: block; text-align: center; border: 0; padding-bottom: 6px; }
+.billing-sheet-ticket .billing-sheet-logo { width: 180px; margin: 0 auto 5px; filter: grayscale(1) brightness(0); }
+.billing-sheet-ticket h3 { font-size: 16px; margin-bottom: 3px; }
+.billing-sheet-ticket .billing-sheet-brand p { font-size: 12px; }
+.billing-sheet-ticket .billing-sheet-brand .billing-sheet-ruc { font-size: 13px; margin-bottom: 3px; }
+.billing-sheet-ticket .billing-sheet-reference { max-width: none; border: 0; border-top: 1px dashed #000; border-bottom: 1px dashed #000; border-radius: 0; padding: 9px 0; margin: 9px 0 0; background: #fff; }
+.billing-sheet-ticket .billing-sheet-reference p { font-size: 13px; letter-spacing: 0; }
+.billing-sheet-ticket .billing-sheet-reference strong { font-size: 20px; margin: 3px 0; }
+.billing-sheet-ticket .billing-sheet-reference span { font-size: 12px; letter-spacing: .2px; }
+.billing-sheet-ticket .billing-sheet-customer { display: block; margin: 5px 0 12px; }
+.billing-sheet-ticket .billing-sheet-caption { font-size: 12px; margin-bottom: 3px; letter-spacing: .3px; }
+.billing-sheet-ticket .billing-sheet-customer strong { font-size: 14px; margin-bottom: 3px; }
+.billing-sheet-ticket .billing-sheet-customer p { font-size: 12px; }
+.billing-sheet-ticket .billing-sheet-meta { border-top: 1px dashed #000; padding-top: 7px; margin-top: 8px; }
+.billing-sheet-ticket .billing-sheet-meta p { margin-bottom: 4px; gap: 8px; }
+.billing-sheet-ticket .billing-sheet-items { font-size: 13px; }
+.billing-sheet-ticket .billing-sheet-items th { font-size: 12px; letter-spacing: 0; background: #fff; padding: 7px 0; border-top: 1px solid #000; border-bottom: 1px solid #000; }
+.billing-sheet-ticket .billing-sheet-items td { padding: 9px 0; border-bottom: 1px dashed #000; }
+.billing-sheet-ticket .billing-sheet-items td:first-child { width: 68%; padding-right: 8px; }
 .billing-sheet-ticket .billing-sheet-items td:first-child strong { font-weight: 700; }
-.billing-sheet-ticket .billing-sheet-totals { margin: 18px 0; width: 100%; }
-.billing-sheet-ticket .billing-sheet-totals p { font-size: 10px; }
-.billing-sheet-ticket .billing-sheet-grand-total b { font-size: 20px; }
-.billing-sheet-ticket .billing-sheet-grand-total span { font-size: 9px; }
-.billing-sheet-ticket .billing-sheet-footer { border-top: 1px dashed #b8c6bc; text-align: center; padding-top: 17px; font-size: 9px; }
-.billing-sheet-ticket .billing-sheet-notice { font-size: 9px; }
-.billing-sheet-ticket .billing-sheet-thanks { font-size: 12px; }
+.billing-sheet-ticket .billing-sheet-items small { font-size: 12px; margin-top: 4px; }
+.billing-sheet-ticket .billing-sheet-totals { margin: 12px 0; width: 100%; }
+.billing-sheet-ticket .billing-sheet-totals p { font-size: 13px; margin-bottom: 5px; }
+.billing-sheet-ticket .billing-sheet-totals .billing-sheet-grand-total { border-top: 2px solid #000; margin-top: 8px; padding-top: 8px; }
+.billing-sheet-ticket .billing-sheet-grand-total b { font-size: 22px; }
+.billing-sheet-ticket .billing-sheet-grand-total span { font-size: 12px; }
+.billing-sheet-ticket .billing-sheet-footer { border-top: 1px dashed #000; text-align: center; margin-top: 10px; padding-top: 8px; font-size: 12px; }
+.billing-sheet-ticket .billing-sheet-notice { font-size: 12px; margin-bottom: 8px; }
+.billing-sheet-ticket .billing-sheet-hash { font-size: 12px; }
+.billing-sheet-ticket .billing-sheet-thanks { font-size: 14px; margin: 8px 0 3px; }

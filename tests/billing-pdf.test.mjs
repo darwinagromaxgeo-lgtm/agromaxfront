@@ -91,6 +91,38 @@ test('long receipts grow vertically and A4 can paginate without changing its wid
   }
 });
 
+test('thermal tickets use bold black text, readable small print and a compact top margin', async () => {
+  const definition = buildBillingPrintDefinition(printable, 'TICKET', { example: true });
+  assert.equal(definition.defaultStyle.color, '#000000');
+  assert.equal(definition.defaultStyle.bold, true);
+  assert.ok(definition.defaultStyle.fontSize >= 10);
+  assert.ok(definition.pageMargins[1] <= 6);
+  let textNodes = 0;
+  const visit = value => {
+    if (Array.isArray(value)) return value.forEach(visit);
+    if (!value || typeof value !== 'object') return;
+    if (value.text !== undefined) {
+      textNodes++;
+      assert.equal(value.color, '#000000');
+      assert.equal(value.bold, true);
+      assert.ok(value.fontSize == null || value.fontSize >= 9);
+    }
+    Object.values(value).forEach(visit);
+  };
+  visit(definition.content);
+  assert.ok(textNodes > 15);
+  const content = JSON.stringify(definition.content);
+  assert.ok(content.includes('S/ 1.00'));
+  assert.ok(content.includes('S/ 0.15'));
+  assert.ok(!content.includes('Op. exoneradas'));
+  assert.ok(!content.includes('Op. inafectas'));
+  const a4 = buildBillingPrintDefinition(printable, 'A4', { example: true });
+  assert.equal(a4.defaultStyle.fontSize, 9);
+  assert.equal(a4.pageMargins[1], 32);
+  const bytes = await pdfMake.createPdf(definition).getBuffer();
+  assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
+});
+
 test('issued previews use the emission date and preserve QR fields while examples and beta remain nonfiscal', () => {
   const issued = { ...printable, status: 'ACCEPTED', environment: 'production', series: 'FAG1', number: 1, submittedAt: '2026-11-17T04:30:00Z', hash: 'offline-digest' };
   const view = billingPresentation(issued);

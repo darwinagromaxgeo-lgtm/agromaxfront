@@ -26,9 +26,9 @@ export function BillingDocumentPaper({ document, format, options = {} }: {
       </tr>)}</tbody>
     </table>
     <section className="billing-sheet-totals">
-      <p><span>Op. gravadas</span><b>{billingMoney(document.taxableAmount)}</b></p>
-      <p><span>Op. exoneradas</span><b>{billingMoney(document.exemptAmount)}</b></p>
-      <p><span>Op. inafectas</span><b>{billingMoney(document.unaffectedAmount)}</b></p>
+      {(!ticket || document.taxableAmount > 0) && <p><span>Op. gravadas</span><b>{billingMoney(document.taxableAmount)}</b></p>}
+      {(!ticket || document.exemptAmount > 0) && <p><span>Op. exoneradas</span><b>{billingMoney(document.exemptAmount)}</b></p>}
+      {(!ticket || document.unaffectedAmount > 0) && <p><span>Op. inafectas</span><b>{billingMoney(document.unaffectedAmount)}</b></p>}
       <p><span>IGV</span><b>{billingMoney(document.taxAmount)}</b></p>
       <p className="billing-sheet-grand-total"><span>TOTAL A PAGAR</span><b>{billingMoney(document.total)}</b></p>
     </section>
