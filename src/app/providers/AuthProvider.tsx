@@ -11,6 +11,7 @@ interface AuthContextType {
   branches: Branch[];
   selectedBranch: Branch | null;
   selectBranch: (branchId: string) => void;
+  refreshBranches: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -21,6 +22,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+
+  const refreshBranches = useCallback(async () => {
+    const response = await api.get('/branches/accessible');
+    const available: Branch[] = response.data.data || [];
+    const selectedId = localStorage.getItem('selectedBranchId');
+    const active = available.find(branch => branch.id === selectedId) || available[0] || null;
+    setBranches(available);
+    setSelectedBranch(active);
+    if (active) localStorage.setItem('selectedBranchId', active.id);
+    else localStorage.removeItem('selectedBranchId');
+  }, []);
 
   const fetchUser = useCallback(async () => {
     if (!token) {
@@ -84,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isLoading, branches, selectedBranch, selectBranch }}>
+    <AuthContext.Provider value={{ user, token, login, logout, isLoading, branches, selectedBranch, selectBranch, refreshBranches }}>
       {children}
     </AuthContext.Provider>
   );

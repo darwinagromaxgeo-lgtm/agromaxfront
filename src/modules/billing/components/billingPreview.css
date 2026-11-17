@@ -1,0 +1,66 @@
+.billing-sheet { box-sizing: border-box; color: #24332c; background: #fff; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.billing-sheet * { box-sizing: border-box; }
+.billing-sheet p, .billing-sheet h3 { margin: 0; }
+.billing-sheet-a4 { width: 794px; min-height: 1123px; padding: 44px 44px 32px; display: flex; flex-direction: column; }
+.billing-sheet-header { display: flex; justify-content: space-between; gap: 30px; align-items: flex-start; padding-bottom: 28px; border-bottom: 2px solid #15803d; }
+.billing-sheet-brand { max-width: 360px; }
+.billing-sheet .billing-sheet-logo { width: 225px; height: auto; margin: 0 0 23px; }
+.billing-sheet h3 { font-size: 19px; font-weight: 700; margin-bottom: 5px; }
+.billing-sheet-brand p { color: #647168; font-size: 12px; }
+.billing-sheet-brand .billing-sheet-ruc { color: #263a2d; font-weight: 700; margin-bottom: 5px; }
+.billing-sheet-reference { flex-shrink: 0; max-width: 270px; border: 1px solid #c8e2d1; border-radius: 10px; padding: 18px 16px; text-align: center; background: #f5fcf7; margin-top: 5px; }
+.billing-sheet-reference p { font-size: 12px; font-weight: 700; color: #16783d; letter-spacing: .5px; }
+.billing-sheet-reference strong { display: block; font-size: 23px; margin: 8px 0 9px; }
+.billing-sheet-reference span { display: block; font-size: 10px; font-weight: 700; letter-spacing: .8px; color: #77603b; }
+.billing-sheet-customer { display: grid; grid-template-columns: 1.3fr 1fr; gap: 24px; margin: 26px 0; }
+.billing-sheet .billing-sheet-caption { color: #7b877e; font-size: 10px; font-weight: 700; letter-spacing: 1px; margin-bottom: 7px; }
+.billing-sheet-customer strong { display: block; font-size: 14px; margin-bottom: 5px; }
+.billing-sheet-customer p { font-size: 12px; }
+.billing-sheet-meta { font-size: 12px; }
+.billing-sheet-meta p { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+.billing-sheet-meta span { color: #718075; }
+.billing-sheet-meta b { font-weight: 500; text-align: right; }
+.billing-sheet-items { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+.billing-sheet-items th { background: #eff8f1; color: #16783d; font-size: 10px; letter-spacing: .4px; padding: 12px 8px; }
+.billing-sheet-items td { border-bottom: 1px solid #e7ede8; padding: 16px 8px; vertical-align: top; }
+.billing-sheet-items td:first-child { width: 43%; }
+.billing-sheet-items td:first-child strong { font-weight: 500; }
+.billing-sheet-items td:nth-child(n+2), .billing-sheet-items th:nth-child(n+2) { text-align: right; white-space: nowrap; }
+.billing-sheet-items td:last-child { font-weight: 700; }
+.billing-sheet-items small { display: block; color: #758078; font-size: 10px; margin-top: 4px; }
+.billing-sheet-totals { width: 275px; max-width: 100%; margin: 24px 0 25px auto; }
+.billing-sheet-totals p { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 7px; font-size: 12px; }
+.billing-sheet-totals span { color: #758078; }
+.billing-sheet-totals b { white-space: nowrap; font-weight: 500; }
+.billing-sheet-totals .billing-sheet-grand-total { border-top: 1px solid #d5e4d8; margin-top: 13px; padding-top: 14px; align-items: center; }
+.billing-sheet-grand-total span { font-size: 11px; color: #16783d; font-weight: 700; }
+.billing-sheet-grand-total b { font-size: 25px; color: #16783d; font-weight: 700; }
+.billing-sheet-footer { margin-top: auto; padding-top: 25px; border-top: 1px solid #e2ebe4; font-size: 10px; color: #819087; }
+.billing-sheet-footer .billing-sheet-notice { color: #936022; font-size: 11px; font-weight: 700; margin-bottom: 14px; }
+.billing-sheet-footer .billing-sheet-thanks { font-size: 13px; font-weight: 700; color: #42614d; margin: 15px 0 3px; }
+.billing-sheet-hash { overflow-wrap: anywhere; margin-top: 8px !important; }
+.billing-sheet-ticket { width: 302px; padding: 25px 17px; min-height: 540px; font-size: 11px; }
+.billing-sheet-ticket .billing-sheet-header { display: block; text-align: center; border: 0; padding-bottom: 12px; }
+.billing-sheet-ticket .billing-sheet-logo { width: 190px; margin: 0 auto 16px; }
+.billing-sheet-ticket h3 { font-size: 15px; }
+.billing-sheet-ticket .billing-sheet-brand p { font-size: 10px; }
+.billing-sheet-ticket .billing-sheet-reference { max-width: none; border: 0; border-top: 1px dashed #b8c6bc; border-bottom: 1px dashed #b8c6bc; border-radius: 0; padding: 17px 0; margin: 17px 0 0; background: transparent; }
+.billing-sheet-ticket .billing-sheet-reference p { font-size: 10px; }
+.billing-sheet-ticket .billing-sheet-reference strong { font-size: 18px; margin: 6px 0; }
+.billing-sheet-ticket .billing-sheet-reference span { font-size: 8px; }
+.billing-sheet-ticket .billing-sheet-customer { display: block; margin: 7px 0 19px; }
+.billing-sheet-ticket .billing-sheet-customer strong { font-size: 12px; }
+.billing-sheet-ticket .billing-sheet-customer p { font-size: 10px; }
+.billing-sheet-ticket .billing-sheet-meta { border-top: 1px dashed #d7e0da; padding-top: 10px; margin-top: 12px; }
+.billing-sheet-ticket .billing-sheet-items { font-size: 10px; }
+.billing-sheet-ticket .billing-sheet-items th { font-size: 8px; background: transparent; padding: 10px 0; border-top: 1px dashed #b8c6bc; border-bottom: 1px dashed #b8c6bc; }
+.billing-sheet-ticket .billing-sheet-items td { padding: 12px 0; }
+.billing-sheet-ticket .billing-sheet-items td:first-child { width: 70%; padding-right: 10px; }
+.billing-sheet-ticket .billing-sheet-items td:first-child strong { font-weight: 700; }
+.billing-sheet-ticket .billing-sheet-totals { margin: 18px 0; width: 100%; }
+.billing-sheet-ticket .billing-sheet-totals p { font-size: 10px; }
+.billing-sheet-ticket .billing-sheet-grand-total b { font-size: 20px; }
+.billing-sheet-ticket .billing-sheet-grand-total span { font-size: 9px; }
+.billing-sheet-ticket .billing-sheet-footer { border-top: 1px dashed #b8c6bc; text-align: center; padding-top: 17px; font-size: 9px; }
+.billing-sheet-ticket .billing-sheet-notice { font-size: 9px; }
+.billing-sheet-ticket .billing-sheet-thanks { font-size: 12px; }

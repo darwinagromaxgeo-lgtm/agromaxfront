@@ -43,8 +43,8 @@ export function buildDocDefinition({ sale, companies, client, products }: SalePd
   const hasMultipleIssuers = itemCompanyIds.length > 1;
 
   const baseAmount = sale.items.reduce((sum, item) => {
-    const taxType = productById.get(item.productId)?.taxType || 'GRAVADO';
-    return sum + (taxType === 'GRAVADO' ? item.subtotal / 1.18 : item.subtotal);
+    const taxType = item.taxType || productById.get(item.productId)?.taxType || 'GRAVADO';
+    return sum + (taxType === 'GRAVADO' ? Math.round(item.subtotal / (1 + (item.taxRate ?? 0.18)) * 100) / 100 : item.subtotal);
   }, 0);
   const roundedBase = Math.round(baseAmount * 100) / 100;
   const igv = Math.round((sale.total - roundedBase) * 100) / 100;

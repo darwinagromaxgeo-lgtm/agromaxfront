@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSales, useCreateSale, useCancelSale, useUpdateVoucher } from '../hooks/useSales';
 import { saleService } from '../services/saleService';
 import { useLoans, useCreateLoan, useReturnLoanItems } from '../../loans/hooks/useLoans';
@@ -13,8 +13,14 @@ import { DataTable } from '../../../shared/components/DataTable';
 import { Modal } from '../../../shared/components/Modal';
 import { Pagination } from '../../../shared/components/Pagination';
 import { SearchableSelect } from '../../../shared/components/SearchableSelect';
-import { Receipt, Trash2, Eye, CalendarDays, HandshakeIcon, RotateCcw, XCircle, Copy, Download, User, Package, Building2, AlertCircle, CheckCircle2, Clock, Printer } from 'lucide-react';
+import { Receipt, Trash2, Eye, CalendarDays, HandshakeIcon, RotateCcw, XCircle, Copy, Download, User, Package, Building2, AlertCircle, CheckCircle2, Clock, Printer, RefreshCw } from 'lucide-react';
 import { downloadSalePdf, openSalePdf } from '../utils/salePdf';
+import { saleNoteDocument } from '../utils/saleNoteDocument';
+import { BillingPreviewModal } from '../../billing/components/BillingPreviewModal';
+import type { BillingPrintDocument } from '../../billing/utils/printTypes';
+import { billingService } from '../../billing/services/billingService';
+import { SaleBillingBadge, SaleBillingDocuments } from '../components/SaleBillingDocuments';
+import { billingBlocksCancellation, saleFiscalDocuments, voucherExportRows } from '../utils/saleBilling';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import type { Sale, Loan, Company, Product, ProductPrice, Client, PriceTier, PaymentMethod, Stock } from '../../../shared/types';
@@ -40,6 +46,7 @@ type PaymentMode = string; // paymentMethodId | 'MIXED' | 'CREDIT'
 
 export function SalesPage() {
   const { selectedBranch } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'sales' | 'boletas' | 'facturas' | 'loans'>('sales');
   const [page, setPage] = useState(1);
   const [boletaPage, setBoletaPage] = useState(1);
@@ -51,6 +58,8 @@ export function SalesPage() {
   const [showModal, setShowModal] = useState(false);
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [viewingSale, setViewingSale] = useState<Sale | null>(null);
+  const [notePreview, setNotePreview] = useState<BillingPrintDocument | null>(null);
+  useEffect(() => { setNotePreview(null); setViewingSale(null); setCancellingSale(null); }, [selectedBranch?.id]);
   const [viewingLoan, setViewingLoan] = useState<Loan | null>(null);
   const [returningLoan, setReturningLoan] = useState<Loan | null>(null);
   const [loanStatusFilter, setLoanStatusFilter] = useState('');
@@ -304,12 +313,31 @@ export function SalesPage() {
   const loans = loansData?.data || [];
   const loansTotal = loansData?.total || 0;
 
+  const billingSaleIds = [...new Set<string>(([...sales, ...boletas, ...facturas, ...(viewingSale ? [viewingSale] : [])] as Sale[]).map(sale => sale.id))].sort();
+  const salesBilling = useQuery({ queryKey: ['sales-billing', selectedBranch?.id, billingSaleIds], queryFn: () => billingService.forSales(billingSaleIds), enabled: !!selectedBranch?.id && billingSaleIds.length > 0, staleTime: 15_000 });
+  const fiscalDocuments = salesBilling.data || [];
+  const fiscalKnown = salesBilling.isSuccess;
+  const documentsForSale = (sale: Sale) => saleFiscalDocuments(fiscalDocuments, sale.id);
+  const canCancelSale = (sale: Sale) => fiscalKnown && !billingBlocksCancellation(documentsForSale(sale));
+  const viewingDocuments = viewingSale ? documentsForSale(viewingSale) : [];
+  const renderComprobante = (sale: Sale) => <SaleBillingBadge sale={sale} documents={documentsForSale(sale)} loading={!fiscalKnown && !salesBilling.isError} error={salesBilling.isError} />;
+
   const companyMap = useMemo(() => new Map<string, Company>(companyList.map((c: Company) => [c.id, c])), [companyList]);
   const clientMap = useMemo(() => new Map<string, Client>(clients.map((c: Client) => [c.id, c])), [clients]);
   const productMap = useMemo(() => new Map<string, Product>(products.map((p: Product) => [p.id, p])), [products]);
 
   const getCompanyName = (id?: string, name?: string) => name || (id ? companyMap.get(id)?.name || 'N/A' : 'Mixta');
+  const getSaleCompanyName = (sale: Sale) => {
+    const names = [...new Set(documentsForSale(sale).map(document => document.issuer.name))];
+    if (names.length) return names.join(' / ');
+    const ids = [...new Set(sale.items.map(item => item.companyId))];
+    return ids.length === 1 ? getCompanyName(ids[0]) : 'Mixta';
+  };
   const getClientName = (id?: string) => id ? clientMap.get(id)?.name || 'N/A' : 'Sin cliente';
+  const getSaleClientName = (sale: Sale) => {
+    const names = [...new Set(documentsForSale(sale).map(document => document.receiver.name))];
+    return names.length ? names.join(' / ') : getClientName(sale.clientId);
+  };
   const getProductName = (id: string, name?: string) => name || productMap.get(id)?.name || id;
   const getSalePdfParams = (sale: Sale) => ({
     sale,
@@ -324,8 +352,8 @@ export function SalesPage() {
     for (const sale of allSales) {
       const base = sale.items.reduce((sum: number, item: any) => {
         const product = productMap.get(item.productId);
-        const taxType = product?.taxType || 'GRAVADO';
-        const b = taxType === 'GRAVADO' ? (item.subtotal / 1.18) : item.subtotal;
+        const taxType = item.taxType || product?.taxType || 'GRAVADO';
+        const b = taxType === 'GRAVADO' ? Math.round(item.subtotal / (1 + (item.taxRate ?? 0.18)) * 100) / 100 : item.subtotal;
         return sum + b;
       }, 0);
       const roundedBase = Math.round(base * 100) / 100;
@@ -340,8 +368,8 @@ export function SalesPage() {
     if (cached) return cached.base;
     const base = sale.items.reduce((sum: number, item: any) => {
       const product = productMap.get(item.productId);
-      const taxType = product?.taxType || 'GRAVADO';
-      const b = taxType === 'GRAVADO' ? (item.subtotal / 1.18) : item.subtotal;
+      const taxType = item.taxType || product?.taxType || 'GRAVADO';
+      const b = taxType === 'GRAVADO' ? Math.round(item.subtotal / (1 + (item.taxRate ?? 0.18)) * 100) / 100 : item.subtotal;
       return sum + b;
     }, 0);
     return Math.round(base * 100) / 100;
@@ -360,25 +388,8 @@ export function SalesPage() {
       const allSales: Sale[] = result?.data || [];
       if (allSales.length === 0) { toast.error('No hay datos para exportar'); return; }
 
-      const rows = allSales.filter(s => !s.isCancelled).map(sale => {
-        const companyIds = [...new Set(sale.items.map((i: any) => i.companyId))];
-        const empresa = companyIds.length === 1 ? getCompanyName(companyIds[0]) : 'Mixta';
-        const productosStr = sale.items.map((i: any) => `${getProductName(i.productId, i.productName)} x${i.quantity}`).join(', ');
-        const baseAmount = getSaleBaseAmount(sale);
-        const igv = getSaleIgv(sale);
-        const paymentLabel = sale.isCredit ? 'Crédito' : sale.payments?.map(p => p.paymentMethodName).join(' + ') || 'Efectivo';
-
-        return {
-          'Fecha': new Date(sale.date).toLocaleDateString('es-PE'),
-          'Cliente': getClientName(sale.clientId),
-          'Empresa': empresa,
-          'Productos': productosStr,
-          'Valor Venta': Math.round(baseAmount * 100) / 100,
-          'IGV': Math.round(igv * 100) / 100,
-          'Total': Math.round(sale.total * 100) / 100,
-          'Método de Pago': paymentLabel,
-        };
-      });
+      const documents = await billingService.forSales(allSales.map(sale => sale.id));
+      const rows = voucherExportRows(allSales, documents, { clients: clientMap, companies: companyMap, products: productMap });
 
       const ws = XLSX.utils.json_to_sheet(rows);
       const wb = XLSX.utils.book_new();
@@ -405,24 +416,16 @@ export function SalesPage() {
 
   const salesColumns = [
     { key: 'date', header: 'Fecha', render: (item: Sale) => new Date(item.date).toLocaleDateString('es-PE') },
-    { key: 'companyId', header: 'Empresa', render: (item: Sale) => {
-      const companyIds = [...new Set(item.items.map(i => i.companyId))];
-      if (companyIds.length === 1) return getCompanyName(companyIds[0]);
-      return <span className="text-purple-600 font-medium">Mixta</span>;
-    }},
-    { key: 'clientId', header: 'Cliente', render: (item: Sale) => getClientName(item.clientId) },
+    { key: 'companyId', header: 'Empresa', render: (item: Sale) => getSaleCompanyName(item) },
+    { key: 'clientId', header: 'Cliente', render: (item: Sale) => getSaleClientName(item) },
     { key: 'items', header: 'Items', render: (item: Sale) => `${item.items.length} producto(s)` },
     { key: 'total', header: 'Total', render: (item: Sale) => item.isCancelled ? <span className="line-through text-gray-400">S/ {item.total.toFixed(2)}</span> : `S/ ${item.total.toFixed(2)}` },
-    { key: 'voucherType', header: 'Comprobante', render: (item: Sale) => {
-      if (item.voucherType === 'BOLETA') return <span className="text-primary-600 font-medium">Boleta</span>;
-      if (item.voucherType === 'FACTURA') return <span className="text-blue-600 font-medium">Factura</span>;
-      return <span className="text-gray-400">-</span>;
-    }},
+    { key: 'voucherType', header: 'Comprobante / SUNAT', render: renderComprobante },
     { key: 'payment', header: 'Pago', render: (item: Sale) => item.isCancelled ? <span className="text-red-600 font-medium">Anulada</span> : getPaymentLabel(item) },
     { key: 'actions', header: '', render: (item: Sale) => (
       <div className="flex items-center gap-2">
         <button onClick={(e) => { e.stopPropagation(); setViewingSale(item); }} className="text-primary-600 hover:text-primary-800 flex items-center gap-1 text-xs font-medium"><Eye size={15} /> Ver</button>
-        {!item.isCancelled && (
+        {!item.isCancelled && canCancelSale(item) && (
           <button onClick={(e) => { e.stopPropagation(); setCancellingSale(item); setCancelReason(''); }} className="text-red-500 hover:text-red-700 flex items-center gap-1 text-xs font-medium"><XCircle size={15} /> Anular</button>
         )}
       </div>
@@ -431,12 +434,9 @@ export function SalesPage() {
 
   const voucherColumns = [
     { key: 'date', header: 'Fecha', render: (item: Sale) => new Date(item.date).toLocaleDateString('es-PE') },
-    { key: 'companyId', header: 'Empresa', render: (item: Sale) => {
-      const companyIds = [...new Set(item.items.map(i => i.companyId))];
-      if (companyIds.length === 1) return getCompanyName(companyIds[0]);
-      return <span className="text-purple-600 font-medium">Mixta</span>;
-    }},
-    { key: 'clientId', header: 'Cliente', render: (item: Sale) => getClientName(item.clientId) },
+    { key: 'fiscal', header: 'Comprobante / SUNAT', render: renderComprobante },
+    { key: 'companyId', header: 'Empresa', render: (item: Sale) => getSaleCompanyName(item) },
+    { key: 'clientId', header: 'Cliente', render: (item: Sale) => getSaleClientName(item) },
     { key: 'items', header: 'Items', render: (item: Sale) => `${item.items.length} producto(s)` },
     { key: 'baseAmount', header: 'Valor Venta', render: (item: Sale) => {
       const base = getSaleBaseAmount(item);
@@ -451,7 +451,7 @@ export function SalesPage() {
     { key: 'actions', header: '', render: (item: Sale) => (
       <div className="flex items-center gap-2">
         <button onClick={(e) => { e.stopPropagation(); setViewingSale(item); }} className="text-primary-600 hover:text-primary-800 flex items-center gap-1 text-xs font-medium"><Eye size={15} /> Ver</button>
-        {!item.isCancelled && (
+        {!item.isCancelled && canCancelSale(item) && (
           <button onClick={(e) => { e.stopPropagation(); setCancellingSale(item); setCancelReason(''); }} className="text-red-500 hover:text-red-700 flex items-center gap-1 text-xs font-medium"><XCircle size={15} /> Anular</button>
         )}
       </div>
@@ -493,6 +493,7 @@ export function SalesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Receipt size={24} /> Ventas</h1>
         <div className="flex flex-col sm:flex-row gap-2">
+          <button type="button" onClick={() => { void queryClient.invalidateQueries({ queryKey: ['sales'] }); void salesBilling.refetch(); }} className="flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm text-gray-700"><RefreshCw size={16} /> Actualizar</button>
           <button onClick={openLoanCreate} className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
             <HandshakeIcon size={18} /> Préstamo
           </button>
@@ -500,6 +501,7 @@ export function SalesPage() {
       </div>
 
       {/* Filters */}
+      {salesBilling.isError && <p role="alert" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">No se pudieron consultar los comprobantes. Pulsa Actualizar para recuperar sus estados y archivos.</p>}
       <div className="mb-4 flex flex-col gap-2">
         {(activeTab === 'sales' || activeTab === 'boletas' || activeTab === 'facturas') && (
           <select value={companyFilter} onChange={(e) => { setCompanyFilter(e.target.value); setPage(1); setBoletaPage(1); setFacturaPage(1); }} className="w-full sm:w-auto px-3 py-2 border rounded-lg text-sm">
@@ -545,7 +547,7 @@ export function SalesPage() {
         <div className="mb-4 bg-primary-50 border border-primary-200 rounded-lg px-4 py-3">
           <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
             <div className="flex items-center gap-2 text-sm text-primary-700">
-              <span>{boletasTotal - boletasCancelledCount} boleta(s) activa(s) en el período</span>
+              <span>{boletasTotal - boletasCancelledCount} venta(s) con boleta · incluye pendientes de emisión</span>
               {boletasCancelledCount > 0 && (
                 <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-semibold rounded-full">
                   {boletasCancelledCount} anulada{boletasCancelledCount !== 1 ? 's' : ''}
@@ -569,7 +571,7 @@ export function SalesPage() {
         <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
           <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
             <div className="flex items-center gap-2 text-sm text-blue-700">
-              <span>{facturasTotal - facturasCancelledCount} factura(s) activa(s) en el período</span>
+              <span>{facturasTotal - facturasCancelledCount} venta(s) con factura · incluye pendientes de emisión</span>
               {facturasCancelledCount > 0 && (
                 <span className="px-2 py-0.5 bg-red-100 text-red-600 text-xs font-semibold rounded-full">
                   {facturasCancelledCount} anulada{facturasCancelledCount !== 1 ? 's' : ''}
@@ -612,8 +614,7 @@ export function SalesPage() {
             {isLoading ? <div className="py-16 text-center text-gray-400 text-sm">Cargando...</div>
               : sales.length === 0 ? <div className="py-16 text-center text-gray-400 text-sm">Sin ventas en el período</div>
               : sales.map((sale: Sale) => {
-                const companyIds = [...new Set(sale.items.map((i: any) => i.companyId))];
-                const companyLabel = companyIds.length === 1 ? getCompanyName(companyIds[0]) : 'Mixta';
+                const companyLabel = getSaleCompanyName(sale);
                 const cancelled = sale.isCancelled;
                 return (
                   <div key={sale.id} className={`bg-white rounded-xl border shadow-sm p-4 ${cancelled ? 'opacity-60 border-red-200 bg-red-50/30' : sale.isCredit ? 'border-yellow-200' : 'border-gray-200'}`}>
@@ -625,18 +626,17 @@ export function SalesPage() {
                         ? <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full flex-shrink-0">Anulada</span>
                         : <span className="flex-shrink-0 text-xs">{getPaymentLabel(sale)}</span>}
                     </div>
-                    <div className="text-sm font-medium text-gray-800 mb-2">{getClientName(sale.clientId)}</div>
+                    <div className="text-sm font-medium text-gray-800 mb-2">{getSaleClientName(sale)}</div>
+                    <div className="mb-2 lg:hidden">{renderComprobante(sale)}</div>
                     <div className="flex items-center justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2 text-xs text-gray-500">
                         <span>{sale.items.length} prod.</span>
-                        {sale.voucherType === 'BOLETA' && <span className="text-primary-600 font-medium">Boleta</span>}
-                        {sale.voucherType === 'FACTURA' && <span className="text-blue-600 font-medium">Factura</span>}
                       </div>
                       <span className={`font-bold text-base ${cancelled ? 'line-through text-gray-400' : 'text-gray-800'}`}>S/ {sale.total.toFixed(2)}</span>
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setViewingSale(sale)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"><Eye size={13} /> Ver detalle</button>
-                      {!cancelled && <button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button>}
+                      {!cancelled && canCancelSale(sale) && <button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button>}
                     </div>
                   </div>
                 );
@@ -656,8 +656,7 @@ export function SalesPage() {
             {boletasLoading ? <div className="py-16 text-center text-gray-400 text-sm">Cargando...</div>
               : boletas.length === 0 ? <div className="py-16 text-center text-gray-400 text-sm">Sin boletas en el período</div>
               : boletas.map((sale: Sale) => {
-                const companyIds = [...new Set(sale.items.map((i: any) => i.companyId))];
-                const companyLabel = companyIds.length === 1 ? getCompanyName(companyIds[0]) : 'Mixta';
+                const companyLabel = getSaleCompanyName(sale);
                 const cancelled = sale.isCancelled;
                 const base = getSaleBaseAmount(sale);
                 const igv = getSaleIgv(sale);
@@ -667,7 +666,8 @@ export function SalesPage() {
                       <div className="text-xs text-gray-500">{new Date(sale.date).toLocaleDateString('es-PE')} · <span className="font-medium text-gray-700">{companyLabel}</span></div>
                       {cancelled ? <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full flex-shrink-0">Anulada</span> : <span className="flex-shrink-0 text-xs">{getPaymentLabel(sale)}</span>}
                     </div>
-                    <div className="text-sm font-medium text-gray-800 mb-2">{getClientName(sale.clientId)}</div>
+                    <div className="text-sm font-medium text-gray-800 mb-2">{getSaleClientName(sale)}</div>
+                    <div className="mb-2 lg:hidden">{renderComprobante(sale)}</div>
                     <div className="flex items-end justify-between gap-2 mb-3">
                       <div className="text-xs text-gray-500 space-y-0.5">
                         <div>Valor Venta: <span className={cancelled ? 'line-through text-gray-400' : 'font-medium text-gray-700'}>S/ {base.toFixed(2)}</span></div>
@@ -677,7 +677,7 @@ export function SalesPage() {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setViewingSale(sale)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"><Eye size={13} /> Ver detalle</button>
-                      {!cancelled && <button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button>}
+                      {!cancelled && canCancelSale(sale) && <button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button>}
                     </div>
                   </div>
                 );
@@ -697,8 +697,7 @@ export function SalesPage() {
             {facturasLoading ? <div className="py-16 text-center text-gray-400 text-sm">Cargando...</div>
               : facturas.length === 0 ? <div className="py-16 text-center text-gray-400 text-sm">Sin facturas en el período</div>
               : facturas.map((sale: Sale) => {
-                const companyIds = [...new Set(sale.items.map((i: any) => i.companyId))];
-                const companyLabel = companyIds.length === 1 ? getCompanyName(companyIds[0]) : 'Mixta';
+                const companyLabel = getSaleCompanyName(sale);
                 const cancelled = sale.isCancelled;
                 const base = getSaleBaseAmount(sale);
                 const igv = getSaleIgv(sale);
@@ -708,7 +707,8 @@ export function SalesPage() {
                       <div className="text-xs text-gray-500">{new Date(sale.date).toLocaleDateString('es-PE')} · <span className="font-medium text-gray-700">{companyLabel}</span></div>
                       {cancelled ? <span className="text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded-full flex-shrink-0">Anulada</span> : <span className="flex-shrink-0 text-xs">{getPaymentLabel(sale)}</span>}
                     </div>
-                    <div className="text-sm font-medium text-gray-800 mb-2">{getClientName(sale.clientId)}</div>
+                    <div className="text-sm font-medium text-gray-800 mb-2">{getSaleClientName(sale)}</div>
+                    <div className="mb-2 lg:hidden">{renderComprobante(sale)}</div>
                     <div className="flex items-end justify-between gap-2 mb-3">
                       <div className="text-xs text-gray-500 space-y-0.5">
                         <div>Valor Venta: <span className={cancelled ? 'line-through text-gray-400' : 'font-medium text-gray-700'}>S/ {base.toFixed(2)}</span></div>
@@ -718,7 +718,7 @@ export function SalesPage() {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setViewingSale(sale)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"><Eye size={13} /> Ver detalle</button>
-                      {!cancelled && <button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button>}
+                      {!cancelled && canCancelSale(sale) && <button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button>}
                     </div>
                   </div>
                 );
@@ -851,7 +851,7 @@ export function SalesPage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Comprobante</label>
               <div className="flex gap-1">
-                {[{ value: 'NONE', label: 'No' }, { value: 'BOLETA', label: 'Boleta' }, { value: 'FACTURA', label: 'Factura' }].map(opt => (
+                {[{ value: 'NONE', label: 'Nota de venta' }, { value: 'BOLETA', label: 'Boleta' }, { value: 'FACTURA', label: 'Factura' }].map(opt => (
                   <button key={opt.value} type="button" onClick={() => setForm({ ...form, voucherType: opt.value })}
                     className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors ${form.voucherType === opt.value
                       ? opt.value === 'BOLETA' ? 'bg-primary-600 text-white border-primary-600' : opt.value === 'FACTURA' ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-600 text-white border-gray-600'
@@ -951,7 +951,7 @@ export function SalesPage() {
               </div>
               <div className="bg-gray-50 rounded-lg p-3">
                 <span className="block text-xs text-gray-500">Cliente</span>
-                <span className="text-sm font-medium">{getClientName(viewingSale.clientId)}</span>
+                <span className="text-sm font-medium">{getSaleClientName(viewingSale)}</span>
               </div>
               <div className="bg-gray-50 rounded-lg p-3">
                 <span className="block text-xs text-gray-500">Tipo de pago</span>
@@ -961,13 +961,13 @@ export function SalesPage() {
               </div>
               <div className="bg-gray-50 rounded-lg p-3">
                 <span className="block text-xs text-gray-500 mb-1">Comprobante</span>
-                {viewingSale.isCancelled ? (
+                {viewingSale.isCancelled || !fiscalKnown || viewingDocuments.length > 0 ? (
                   <span className={`text-sm font-medium ${viewingSale.voucherType === 'BOLETA' ? 'text-primary-600' : viewingSale.voucherType === 'FACTURA' ? 'text-blue-600' : 'text-gray-500'}`}>
-                    {viewingSale.voucherType === 'BOLETA' ? 'Boleta' : viewingSale.voucherType === 'FACTURA' ? 'Factura' : 'Sin comprobante'}
+                    {viewingDocuments.length ? [...new Set(viewingDocuments.map(document => document.documentType === 'FACTURA' ? 'Factura' : 'Boleta'))].join(' / ') : viewingSale.voucherType === 'BOLETA' ? 'Boleta' : viewingSale.voucherType === 'FACTURA' ? 'Factura' : 'Nota de venta'}
                   </span>
                 ) : (
                   <div className="flex gap-1">
-                    {([['NONE', 'No'], ['BOLETA', 'Boleta'], ['FACTURA', 'Factura']] as const).map(([val, label]) => (
+                    {([['NONE', 'Nota de venta'], ['BOLETA', 'Boleta'], ['FACTURA', 'Factura']] as const).map(([val, label]) => (
                       <button key={val} type="button"
                         className={`px-2 py-1 rounded text-xs font-medium transition-colors ${viewingSale.voucherType === val ? (val === 'BOLETA' ? 'bg-primary-600 text-white' : val === 'FACTURA' ? 'bg-blue-600 text-white' : 'bg-gray-600 text-white') : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
                         disabled={updateVoucher.isPending}
@@ -985,7 +985,15 @@ export function SalesPage() {
               </div>
             </div>
 
-            <div className="flex flex-wrap justify-end gap-2">
+            {!fiscalKnown ? <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600">{salesBilling.isError ? 'Estado de comprobantes no disponible. Pulsa Actualizar.' : 'Consultando los comprobantes guardados…'}</p>
+              : viewingDocuments.length > 0 ? <SaleBillingDocuments documents={viewingDocuments} onPreview={setNotePreview} />
+                : viewingSale.voucherType !== 'NONE' && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p>Esta venta aún no tiene un comprobante emitido a SUNAT.</p><a href={`/billing?saleId=${viewingSale.id}`} className="mt-2 inline-block font-semibold underline">Preparar comprobante en Facturación</a></div>}
+
+            {fiscalKnown && !viewingDocuments.length && viewingSale.voucherType === 'NONE' && <div className="flex flex-wrap justify-end gap-2">
+              {viewingSale.voucherType === 'NONE' && <button type="button" onClick={() => {
+                try { setNotePreview(saleNoteDocument({ ...getSalePdfParams(viewingSale), branchId: selectedBranch?.id || '' })); }
+                catch { toast.error('No se pudo preparar la nota de venta'); }
+              }} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 text-sm font-medium"><Eye size={15} /> Nota de venta · A4 y ticket</button>}
               <button
                 type="button"
                 onClick={() => openSalePdf(getSalePdfParams(viewingSale))}
@@ -1000,7 +1008,7 @@ export function SalesPage() {
               >
                 <Download size={15} /> Descargar PDF
               </button>
-            </div>
+            </div>}
 
             {/* Desglose de pagos */}
             {!viewingSale.isCredit && viewingSale.payments && viewingSale.payments.length > 0 && (
@@ -1047,7 +1055,7 @@ export function SalesPage() {
                       const product = productMap.get(item.productId);
                       const company = companyMap.get(item.companyId);
                       const tier = tiers.find((t: PriceTier) => t.id === item.priceTier);
-                      const taxType = product?.taxType || 'GRAVADO';
+                      const taxType = item.taxType || product?.taxType || 'GRAVADO';
                       const sunatTier = tiers.find((t: PriceTier) => t.name === 'PRECIO SUNAT');
                       const sunatPrice = sunatTier ? product?.prices?.find((p: ProductPrice) => p.priceTierId === sunatTier.id)?.price : undefined;
                       const precioVenta = sunatPrice != null
@@ -1096,6 +1104,8 @@ export function SalesPage() {
           </div>
         )}
       </Modal>
+
+      <BillingPreviewModal isOpen={!!notePreview} onClose={() => setNotePreview(null)} document={notePreview} />
 
       {/* Modal crear préstamo */}
       <Modal isOpen={showLoanModal} onClose={() => setShowLoanModal(false)} title="Nuevo Préstamo" size="lg">

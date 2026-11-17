@@ -32,6 +32,7 @@ const AgreementDetailPage = lazy(() => import('../../modules/accounts-payable/pa
 const POSPage = lazy(() => import('../../modules/pos/pages/POSPage').then(m => ({ default: m.POSPage })));
 const QuotesPage = lazy(() => import('../../modules/quotes/pages/QuotesPage').then(m => ({ default: m.QuotesPage })));
 const InvoicesPage = lazy(() => import('../../modules/invoices/pages/InvoicesPage').then(m => ({ default: m.InvoicesPage })));
+const BillingPage = lazy(() => import('../../modules/billing/pages/BillingPage').then(m => ({ default: m.BillingPage })));
 const BranchesPage = lazy(() => import('../../modules/branches/pages/BranchesPage').then(m => ({ default: m.BranchesPage })));
 
 const Loading = AppLoading;
@@ -71,6 +72,7 @@ export function AppRoutes() {
         <Route path="accounts-payable" element={<Suspense fallback={<Loading />}><AccountsPayablePage /></Suspense>} />
         <Route path="agreements/:id" element={<Suspense fallback={<Loading />}><AgreementDetailPage /></Suspense>} />
         <Route path="invoices" element={<Suspense fallback={<Loading />}><InvoicesPage /></Suspense>} />
+        <Route path="billing" element={<Suspense fallback={<Loading />}><BillingPage /></Suspense>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

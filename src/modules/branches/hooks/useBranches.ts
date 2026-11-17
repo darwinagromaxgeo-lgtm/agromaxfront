@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { branchService } from '../services/branchService';
+import { useAuth } from '../../../app/providers/AuthProvider';
 
 export function useBranches() {
   return useQuery({ queryKey: ['branches'], queryFn: branchService.getAll });
@@ -8,18 +9,20 @@ export function useBranches() {
 
 export function useCreateBranch() {
   const queryClient = useQueryClient();
+  const { refreshBranches } = useAuth();
   return useMutation({
     mutationFn: branchService.create,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['branches'] }); toast.success('Sucursal creada'); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['branches'] }); void refreshBranches().catch(() => toast.error('Sucursal guardada. Recarga la página para actualizar el selector.')); toast.success('Sucursal creada'); },
     onError: (error: any) => toast.error(error.response?.data?.message || 'No se pudo crear la sucursal'),
   });
 }
 
 export function useUpdateBranch() {
   const queryClient = useQueryClient();
+  const { refreshBranches } = useAuth();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => branchService.update(id, data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['branches'] }); toast.success('Sucursal actualizada'); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['branches'] }); queryClient.invalidateQueries({ queryKey: ['billing-connection'] }); void refreshBranches().catch(() => toast.error('Sucursal guardada. Recarga la página para actualizar el selector.')); toast.success('Sucursal actualizada'); },
     onError: (error: any) => toast.error(error.response?.data?.message || 'No se pudo actualizar la sucursal'),
   });
 }

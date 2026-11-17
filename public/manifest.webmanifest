@@ -59,6 +59,18 @@
           "type": "image/png"
         }
       ]
+    },
+    {
+      "name": "Facturación",
+      "short_name": "Facturación",
+      "url": "/billing",
+      "icons": [
+        {
+          "src": "/brand/agromax-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ],
   "id": "/dashboard"

@@ -8,14 +8,23 @@ import { usePaymentMethods } from '../../payment-methods/hooks/usePaymentMethods
 import { useCreateSale } from '../../sales/hooks/useSales';
 import { useCreateQuote, useQuote, useConvertQuote } from '../../quotes/hooks/useQuotes';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { stockService } from '../../stock/services/stockService';
 import { Search, Plus, Minus, Trash2, Package, X, ShoppingCart, CreditCard, User, Pencil, Tag, ScrollText, Landmark, ChevronDown, LayoutGrid, List, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import type { Product, ProductPrice, Category, Company, Client, PriceTier, PaymentMethod, CreditAccount, ProductLot } from '../../../shared/types';
+import type { Product, ProductPrice, Category, Company, Client, PriceTier, PaymentMethod, CreditAccount, ProductLot, Sale } from '../../../shared/types';
 import { productLotService } from '../../stock/services/productLotService';
 import { useOpenClientCredits } from '../../credits/hooks/useCredits';
 import { useAuth } from '../../../app/providers/AuthProvider';
+import { billingService } from '../../billing/services/billingService';
+import type { BillingDocument, BillingParty } from '../../billing/types';
+import { BillingRecipientForm } from '../../billing/components/BillingRecipientForm';
+import { BillingPreviewModal } from '../../billing/components/BillingPreviewModal';
+import type { BillingPrintDocument } from '../../billing/utils/printTypes';
+import { recipientFormError, recipientFormFromParty, recipientParty, type RecipientFormState } from '../../billing/utils/recipientForm';
+import { saleNoteDocument } from '../../sales/utils/saleNoteDocument';
+import { CheckoutBillingResult } from '../components/CheckoutBillingResult';
+import { checkoutDocuments, emitCheckoutDocuments } from '../services/posBilling';
 
 const IGV_RATE = 0.18;
 
@@ -42,6 +51,7 @@ interface CartItem {
   productId: string;
   name: string;
   unit: string;
+  taxType?: 'GRAVADO' | 'EXONERADO' | 'INAFECTO';
   quantity: number;
   unitPrice: number;
   imageUrl?: string;
@@ -52,6 +62,8 @@ interface CartItem {
   expirationDate?: string;
   lotCurrentQty?: number;   // stock cap for this specific lot
 }
+
+const cartTaxType = (value?: string): NonNullable<CartItem['taxType']> => value === 'EXONERADO' || value === 'INAFECTO' ? value : 'GRAVADO';
 
 function resolvePrice(product: Product, tierId: string, companyId: string, branchId?: string): number | undefined {
   if (!product.prices?.length) return undefined;
@@ -73,6 +85,7 @@ const BROWSE_LIMIT = 24;
 
 export function POSPage() {
   const { selectedBranch } = useAuth();
+  const queryClient = useQueryClient();
   // Estados de búsqueda/paginación (antes del query para usarlos como params)
   const [categoryId, setCategoryId] = useState<string>('');
   const [selectedParentId, setSelectedParentId] = useState<string>('');
@@ -107,8 +120,8 @@ export function POSPage() {
 
   const { data: productsData, isFetching: productsFetching } = useProducts(
     isWideSearch
-      ? { search: debouncedSearch || undefined, activeIngredient: debouncedIngredient || undefined, control: debouncedControl || undefined, category: categoryId || undefined, limit: 500 }
-      : { page: browsePage, limit: BROWSE_LIMIT, category: categoryId || (selectedParentId || undefined) },
+      ? { sellableOnly: true, search: debouncedSearch || undefined, activeIngredient: debouncedIngredient || undefined, control: debouncedControl || undefined, category: categoryId || undefined, limit: 500 }
+      : { sellableOnly: true, page: browsePage, limit: BROWSE_LIMIT, category: categoryId || (selectedParentId || undefined) },
     { placeholderData: (prev: any) => prev },
   );
   const { data: categoriesData } = useCategories();
@@ -121,7 +134,7 @@ export function POSPage() {
   const products: Product[] = useMemo(() => {
     const raw: any = productsData;
     const list: Product[] = Array.isArray(raw) ? raw : raw?.data || [];
-    return list.filter((p) => p.isActive);
+    return list.filter((p) => p.isActive && p.catalogStatus !== 'PENDING_REVIEW' && p.taxType !== 'PENDIENTE');
   }, [productsData]);
 
   const totalProducts: number = useMemo(() => {
@@ -194,16 +207,57 @@ export function POSPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const fromQuoteId = searchParams.get('fromQuote') || '';
   const { data: preloadedQuote } = useQuote(fromQuoteId);
-  const { data: allProductsData } = useProducts({ limit: 9999 }, { enabled: !!fromQuoteId } as any);
+  const { data: allProductsData } = useProducts({ limit: 9999, sellableOnly: true }, { enabled: !!fromQuoteId } as any);
   const allProducts: Product[] = useMemo(() => {
     if (!fromQuoteId) return products;
     const raw: any = allProductsData;
     const list: Product[] = Array.isArray(raw) ? raw : raw?.data || [];
-    return list.filter((p) => p.isActive);
+    return list.filter((p) => p.isActive && p.catalogStatus !== 'PENDING_REVIEW' && p.taxType !== 'PENDIENTE');
   }, [fromQuoteId, allProductsData, products]);
   const [sourceQuoteId, setSourceQuoteId] = useState<string>('');
   const [clientId, setClientId] = useState<string>('');
   const [voucherType, setVoucherType] = useState<'NONE' | 'BOLETA' | 'FACTURA'>('NONE');
+  const [recipient, setRecipient] = useState<RecipientFormState>(() => recipientFormFromParty());
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const checkoutLock = useRef(false);
+  const [checkoutResult, setCheckoutResult] = useState<{ sale: Sale; voucherType: 'NONE' | 'BOLETA' | 'FACTURA'; receiver?: BillingParty; documents: BillingDocument[]; error?: string; note?: BillingPrintDocument } | null>(null);
+  const [printPreview, setPrintPreview] = useState<BillingPrintDocument | null>(null);
+  const billingConnection = useQuery({ queryKey: ['billing-connection', selectedBranch?.id], queryFn: billingService.status, enabled: showCheckout && voucherType !== 'NONE', retry: false, staleTime: 15_000 });
+  const fiscalStatus = billingConnection.data;
+  const issuerMatchesCompany = !!fiscalStatus?.issuerRuc && fiscalStatus.issuerRuc === companies.find(company => company.id === companyId)?.ruc;
+  const fiscalBlockReason = !fiscalStatus
+    ? billingConnection.isFetching ? 'Comprobando facturador…' : 'No se pudo conectar con el facturador. Vuelve a comprobar la conexión.'
+    : !fiscalStatus.ready ? fiscalStatus.message
+    : !issuerMatchesCompany ? `Selecciona la empresa del RUC ${fiscalStatus.issuerRuc} en el POS. El facturador está configurado para ese emisor.`
+    : !fiscalStatus.supportedDocumentTypes.includes(voucherType === 'FACTURA' ? 'FACTURA' : 'BOLETA')
+      ? voucherType === 'BOLETA' && fiscalStatus.message.includes('resumen diario')
+        ? `Boleta ${fiscalStatus.series?.BOLETA || ''}: envío pendiente. La serie ya está configurada; falta coordinar la numeración de los resúmenes RC con el otro software del RUC.`
+        : fiscalStatus.message
+      : undefined;
+  const fiscalReady = !fiscalBlockReason;
+  const canSwitchToFactura = voucherType === 'BOLETA' && fiscalStatus?.ready && issuerMatchesCompany && fiscalStatus.supportedDocumentTypes.includes('FACTURA');
+  const selectedParty = (id: string) => { const client = clients.find(item => item.id === id); const number = client?.documentNumber || ''; return client ? { name: client.name, documentType: (number.length === 11 ? 'RUC' : number.length === 8 ? 'DNI' : 'UNIDENTIFIED') as BillingParty['documentType'], documentNumber: number || undefined, address: client.address, email: client.email } : undefined; };
+  const chooseVoucher = (value: 'NONE' | 'BOLETA' | 'FACTURA') => { setVoucherType(value); if (value !== 'NONE') setRecipient(recipientFormFromParty(selectedParty(clientId), value)); };
+  const closeCheckout = () => { if (checkoutBusy) return; setShowCheckout(false); setCheckoutResult(null); };
+  const billingError = (error: any) => { const message = error?.response?.data?.message; return Array.isArray(message) ? message.join(' ') : typeof message === 'string' ? message : error?.message || 'No se pudo confirmar la emisión. Actualiza su resultado.'; };
+  const updateResultDocuments = (documents: BillingDocument[]) => {
+    setCheckoutResult(previous => previous ? { ...previous, documents } : previous);
+    void queryClient.invalidateQueries({ queryKey: ['sales-billing'] });
+    void queryClient.invalidateQueries({ queryKey: ['billing'] });
+  };
+  const continueEmission = async () => {
+    if (checkoutLock.current || !checkoutResult || !checkoutResult.receiver || checkoutResult.voucherType === 'NONE') return;
+    checkoutLock.current = true; setCheckoutBusy(true);
+    try { await emitCheckoutDocuments(checkoutResult.sale.id, checkoutResult.voucherType, checkoutResult.receiver, updateResultDocuments, !checkoutResult.sale.isCredit, checkoutResult.sale.total); setCheckoutResult(previous => previous ? { ...previous, error: undefined } : previous); }
+    catch (error) { const documents = await checkoutDocuments(checkoutResult.sale.id).catch(() => checkoutResult.documents); setCheckoutResult(previous => previous ? { ...previous, documents, error: billingError(error) } : previous); }
+    finally { checkoutLock.current = false; setCheckoutBusy(false); }
+  };
+  const refreshEmission = async () => {
+    if (!checkoutResult || checkoutLock.current) return; checkoutLock.current = true; setCheckoutBusy(true);
+    try { const documents = await checkoutDocuments(checkoutResult.sale.id); updateResultDocuments(await Promise.all(documents.map(document => document.status === 'PENDING' ? billingService.checkStatus(document.id) : document))); }
+    catch (error) { toast.error(billingError(error)); }
+    finally { checkoutLock.current = false; setCheckoutBusy(false); }
+  };
   const [paymentMethodId, setPaymentMethodId] = useState<string>('');
   const [splitPayments, setSplitPayments] = useState<{ paymentMethodId: string; amount: number }[]>([]);
   const [isCredit, setIsCredit] = useState(false);
@@ -265,6 +319,7 @@ export function POSPage() {
         productId: i.productId,
         name: p?.name || '—',
         unit: p?.unit || '',
+        taxType: cartTaxType(p?.taxType),
         quantity: i.quantity,
         unitPrice: i.unitPrice,
         tierOverride: i.priceTier,
@@ -379,6 +434,7 @@ export function POSPage() {
           productId: product.id,
           name: product.name,
           unit: product.unit,
+          taxType: cartTaxType(product.taxType),
           quantity: 1,
           unitPrice: price,
           imageUrl: product.imageUrl,
@@ -402,6 +458,7 @@ export function POSPage() {
         productId: lotSelectorProduct.id,
         name: lotSelectorProduct.name,
         unit: lotSelectorProduct.unit,
+        taxType: cartTaxType(lotSelectorProduct.taxType),
         quantity: 1,
         unitPrice: price,
         imageUrl: lotSelectorProduct.imageUrl,
@@ -488,6 +545,9 @@ export function POSPage() {
   const subtotal = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
   const igv = subtotal * IGV_RATE;
   const total = subtotal;
+  const headerLines = checkoutResult?.sale.items || cart.map(item => ({ subtotal: item.quantity * item.unitPrice, taxType: item.taxType || 'GRAVADO', taxRate: IGV_RATE }));
+  const headerBase = headerLines.reduce((sum, item) => sum + (item.taxType === 'GRAVADO' ? Math.round(Math.round(item.subtotal * 100) / (1 + (item.taxRate ?? IGV_RATE))) : Math.round(item.subtotal * 100)), 0) / 100;
+  const headerTax = Math.round(((checkoutResult?.sale.total ?? total) - headerBase) * 100) / 100;
 
   const openCheckout = () => {
     if (cart.length === 0) {
@@ -502,7 +562,8 @@ export function POSPage() {
     setCreditAccountId('new');
     setCreditName('');
     setSplitPayments([{ paymentMethodId, amount: 0 }]);
-    setShowCheckout(true);
+    setRecipient(recipientFormFromParty(selectedParty(clientId), voucherType === 'FACTURA' ? 'FACTURA' : 'BOLETA'));
+    setCheckoutResult(null); setShowCheckout(true);
   };
 
   const splitTotal = splitPayments.reduce((s, p) => s + (p.amount || 0), 0);
@@ -523,6 +584,12 @@ export function POSPage() {
   ));
 
   const confirmSale = async () => {
+    if (checkoutLock.current) return;
+    const receiver = voucherType === 'NONE' ? undefined : recipientParty(recipient);
+    if (voucherType !== 'NONE') {
+      const error = recipientFormError(recipient, total); if (error) { toast.error(error); return; }
+      if (!isCredit && !fiscalReady) { toast.error(fiscalBlockReason || 'Verifica la conexión del facturador'); return; }
+    }
     let payloadPayments: { paymentMethodId: string; amount: number }[] = [];
 
     if (isCredit) {
@@ -568,9 +635,11 @@ export function POSPage() {
         ));
       }
     }
+    checkoutLock.current = true; setCheckoutBusy(true);
+    let savedSale: Sale | undefined;
     try {
       if (sourceQuoteId) {
-        await convertQuote.mutateAsync({
+        savedSale = await convertQuote.mutateAsync({
           id: sourceQuoteId,
           payload: {
             companyId,
@@ -581,7 +650,7 @@ export function POSPage() {
           },
         });
       } else {
-        await createSale.mutateAsync({
+        savedSale = await createSale.mutateAsync({
           clientId: clientId || undefined,
           voucherType,
           isCredit,
@@ -598,6 +667,9 @@ export function POSPage() {
           payments: payloadPayments,
         } as any);
       }
+      if (!savedSale?.id) throw new Error('No se recibió la referencia de la venta. Revisa Ventas antes de repetir el registro.');
+      const note = voucherType === 'NONE' ? saleNoteDocument({ sale: savedSale, companies, products: allProducts, client: clients.find(client => client.id === savedSale!.clientId), branchId: selectedBranch?.id || '' }) : undefined;
+      setCheckoutResult({ sale: savedSale, voucherType, receiver, documents: [], note });
       setCart([]);
       setClientId('');
       setVoucherType('NONE');
@@ -605,14 +677,17 @@ export function POSPage() {
       setIsCredit(false);
       setCreditAccountId('new');
       setCreditName('');
-      setShowCheckout(false);
       if (sourceQuoteId) {
         setSourceQuoteId('');
         setSearchParams({});
       }
-    } catch {
-      // errors handled by mutation onError
-    }
+      if (voucherType !== 'NONE' && receiver) await emitCheckoutDocuments(savedSale.id, voucherType, receiver, updateResultDocuments, !isCredit, savedSale.total);
+    } catch (error) {
+      if (savedSale?.id) {
+        const documents = await checkoutDocuments(savedSale.id).catch(() => []);
+        setCheckoutResult(previous => previous ? { ...previous, documents, error: billingError(error) } : { sale: savedSale!, voucherType, receiver, documents, error: billingError(error) });
+      } else toast.error(billingError(error));
+    } finally { checkoutLock.current = false; setCheckoutBusy(false); }
   };
 
   return (
@@ -1452,28 +1527,29 @@ export function POSPage() {
 
       {showCheckout && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCheckout(false)} />
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={closeCheckout} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col max-h-[92vh]">
 
             {/* Header */}
             <div className="bg-primary-600 rounded-t-2xl px-6 py-6 text-white shrink-0">
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <p className="text-white/70 text-sm mb-1">{cart.length} {cart.length === 1 ? 'producto' : 'productos'}</p>
-                  <p className="text-4xl font-bold tracking-tight">S/ {total.toFixed(2)}</p>
+                  <p className="text-white/70 text-sm mb-1">{checkoutResult?.sale.items.length ?? cart.length} productos</p>
+                  <p className="text-4xl font-bold tracking-tight">S/ {(checkoutResult?.sale.total ?? total).toFixed(2)}</p>
                 </div>
-                <button onClick={() => setShowCheckout(false)} className="p-2 rounded-xl hover:bg-white/20 transition-colors mt-1">
+                <button disabled={checkoutBusy} onClick={closeCheckout} className="p-2 rounded-xl hover:bg-white/20 transition-colors mt-1">
                   <X size={20} />
                 </button>
               </div>
               <div className="flex justify-between mt-1 text-xs text-white/60">
-                <span>Base imponible: S/ {(subtotal / (1 + IGV_RATE)).toFixed(2)}</span>
-                <span>IGV 18%: S/ {(subtotal - subtotal / (1 + IGV_RATE)).toFixed(2)}</span>
+                <span>Base imponible: S/ {headerBase.toFixed(2)}</span>
+                <span>IGV: S/ {headerTax.toFixed(2)}</span>
               </div>
             </div>
 
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+              {checkoutResult ? <CheckoutBillingResult sale={checkoutResult.sale} documents={checkoutResult.documents} error={checkoutResult.error} note={checkoutResult.note} busy={checkoutBusy} onPreview={setPrintPreview} onRefresh={refreshEmission} /> : <fieldset disabled={checkoutBusy} className="space-y-6">
 
               {/* 1. Cliente */}
               <div>
@@ -1484,7 +1560,7 @@ export function POSPage() {
                 </div>
                 <select
                   value={clientId}
-                  onChange={(e) => { setClientId(e.target.value); if (!e.target.value) setIsCredit(false); }}
+                  onChange={(e) => { setClientId(e.target.value); if (!e.target.value) setIsCredit(false); if (voucherType !== 'NONE') setRecipient(recipientFormFromParty(selectedParty(e.target.value), voucherType)); }}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-400 bg-white"
                 >
                   <option value="">— Consumidor final —</option>
@@ -1504,14 +1580,14 @@ export function POSPage() {
                   {(['NONE', 'BOLETA', 'FACTURA'] as const).map((v) => (
                     <button
                       key={v}
-                      onClick={() => setVoucherType(v)}
+                      onClick={() => chooseVoucher(v)}
                       className={`py-3 rounded-xl text-sm font-semibold transition-colors border-2 ${
                         voucherType === v
                           ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
                           : 'bg-white text-gray-600 border-gray-200 hover:border-primary-300 hover:bg-primary-50'
                       }`}
                     >
-                      {v === 'NONE' ? 'Ninguno' : v === 'BOLETA' ? 'Boleta' : 'Factura'}
+                      {v === 'NONE' ? 'Nota de venta' : v === 'BOLETA' ? 'Boleta' : 'Factura'}
                     </button>
                   ))}
                 </div>
@@ -1519,6 +1595,7 @@ export function POSPage() {
 
               <div className="border-t border-gray-100" />
 
+              {voucherType !== 'NONE' && <BillingRecipientForm value={recipient} onChange={setRecipient} total={total} documentType={voucherType} disabled={checkoutBusy} heading={voucherType === 'FACTURA' ? 'Receptor de la factura' : 'Receptor de la boleta'} />}
               {/* 3. Tipo de pago */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
@@ -1694,24 +1771,37 @@ export function POSPage() {
                   </div>
                 </>
               )}
+              </fieldset>}
             </div>
 
             {/* Footer */}
             <div className="px-6 py-5 border-t-2 border-gray-100 shrink-0">
+              {checkoutResult ? <div className="flex gap-2">{checkoutResult.error && checkoutResult.receiver && !checkoutResult.sale.isCredit && !checkoutResult.documents.some(document => ['SENDING', 'UNKNOWN', 'REJECTED'].includes(document.status)) && <button disabled={checkoutBusy} onClick={continueEmission} className="flex-1 rounded-xl bg-primary-600 px-4 py-3 font-bold text-white disabled:opacity-50">Continuar emisión</button>}<button disabled={checkoutBusy} onClick={closeCheckout} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-bold text-slate-700 disabled:opacity-50">Cerrar</button></div> : <>
+              {voucherType !== 'NONE' && !isCredit && !fiscalReady && <div className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+                <p id="checkout-fiscal-block" role="alert">{fiscalBlockReason}</p>
+                <div className="mt-2 flex flex-wrap gap-3">
+                  {canSwitchToFactura && <button type="button" disabled={checkoutBusy} onClick={() => chooseVoucher('FACTURA')} className="font-semibold underline">Cambiar a factura {fiscalStatus?.series?.FACTURA} · requiere RUC</button>}
+                  <button type="button" disabled={checkoutBusy || billingConnection.isFetching} onClick={() => void billingConnection.refetch()} className="font-semibold underline disabled:opacity-50">Volver a comprobar</button>
+                </div>
+              </div>}
+              {voucherType !== 'NONE' && (isCredit || fiscalReady) && recipientFormError(recipient, total) && <p className="mb-3 text-sm text-amber-800" role="status">{recipientFormError(recipient, total)}</p>}
               <button
                 onClick={confirmSale}
-                disabled={createSale.isPending}
+                aria-describedby={voucherType !== 'NONE' && !isCredit && !fiscalReady ? 'checkout-fiscal-block' : undefined}
+                disabled={checkoutBusy || (voucherType !== 'NONE' && (!!recipientFormError(recipient, total) || (!isCredit && !fiscalReady)))}
                 className={`w-full py-4 text-white rounded-xl disabled:opacity-50 font-bold text-lg transition-colors shadow-sm flex items-center justify-center gap-2 ${
                   isCredit ? 'bg-orange-500 hover:bg-orange-600' : 'bg-primary-600 hover:bg-primary-700'
                 }`}
               >
                 {isCredit ? <Landmark size={20} /> : <CreditCard size={20} />}
-                {createSale.isPending ? 'Procesando…' : isCredit ? `Registrar a Crédito · S/ ${total.toFixed(2)}` : `Confirmar Venta · S/ ${total.toFixed(2)}`}
+                {checkoutBusy ? 'Procesando…' : isCredit ? `Registrar a Crédito · S/ ${total.toFixed(2)}` : voucherType === 'NONE' ? `Confirmar Venta · S/ ${total.toFixed(2)}` : `Confirmar venta y emitir · S/ ${total.toFixed(2)}`}
               </button>
+              </>}
             </div>
           </div>
         </div>
       )}
+      <BillingPreviewModal isOpen={!!printPreview} onClose={() => setPrintPreview(null)} document={printPreview} />
       {/* Mobile overlay */}
       {cartOpen && (
         <div

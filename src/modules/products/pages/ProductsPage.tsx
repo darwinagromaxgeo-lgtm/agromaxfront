@@ -14,6 +14,7 @@ import { useDebounce } from '../../../shared/hooks/useDebounce';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Search, Edit2, Trash2, ChevronDown, ChevronUp, Copy, X, Layers, Download, Upload, Truck, Package, Camera, Image, SlidersHorizontal, Check, Pencil, PowerOff } from 'lucide-react';
 import { ProductSuppliersModal } from '../components/ProductSuppliersModal';
+import { ProductCatalogReview } from '../components/ProductCatalogReview';
 import { stockService } from '../../stock/services/stockService';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -21,6 +22,7 @@ import type { Product } from '../../../shared/types';
 import { useAuth } from '../../../app/providers/AuthProvider';
 
 const TAX_TYPES = [
+  { value: 'PENDIENTE', label: 'IGV por confirmar' },
   { value: 'GRAVADO', label: 'Gravado (IGV 18%)' },
   { value: 'EXONERADO', label: 'Exonerado' },
   { value: 'INAFECTO', label: 'Inafecto' },
@@ -623,13 +625,14 @@ export function ProductsPage() {
     { key: 'dosis', header: 'Dosis', render: (item: Product) => item.dosis ? <span className="text-xs text-gray-700">{item.dosis}</span> : <span className="text-gray-300">—</span> },
     { key: 'taxType', header: 'IGV', render: (item: Product) => {
       const t = TAX_TYPES.find(tx => tx.value === (item.taxType || 'GRAVADO'));
-      const colors = item.taxType === 'EXONERADO' ? 'bg-yellow-100 text-yellow-800' : item.taxType === 'INAFECTO' ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800';
+      const colors = item.taxType === 'PENDIENTE' ? 'bg-amber-100 text-amber-800' : item.taxType === 'EXONERADO' ? 'bg-yellow-100 text-yellow-800' : item.taxType === 'INAFECTO' ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800';
       return <span className={`px-2 py-1 rounded-full text-xs ${colors}`}>{t?.label || 'Gravado'}</span>;
     }},
     { key: 'prices', header: 'Precios', render: (item: Product) => {
       const displayPrices = getPricesForDisplay(item);
       return (
         <div className="text-xs space-y-1">
+          {!displayPrices.length && <span className="text-amber-700">Precio por completar</span>}
           {displayPrices.map((p) => {
             const tier = tiers.find((t: any) => t.id === p.priceTierId);
             const isBranchSpecific = p.branchId === selectedBranch?.id;
@@ -643,7 +646,7 @@ export function ProductsPage() {
         </div>
       );
     }},
-    { key: 'isActive', header: 'Estado', render: (item: Product) => <span className={`px-2 py-1 rounded-full text-xs ${item.isActive ? 'bg-primary-100 text-primary-800' : 'bg-red-100 text-red-800'}`}>{item.isActive ? 'Activo' : 'Inactivo'}</span> },
+    { key: 'isActive', header: 'Estado', render: (item: Product) => <span className={`px-2 py-1 rounded-full text-xs ${!item.isActive ? 'bg-red-100 text-red-800' : item.catalogStatus === 'PENDING_REVIEW' ? 'bg-amber-100 text-amber-800' : 'bg-primary-100 text-primary-800'}`}>{!item.isActive ? 'Inactivo' : item.catalogStatus === 'PENDING_REVIEW' ? 'Pendiente de completar' : 'Activo'}</span> },
     { key: 'actions', header: 'Acciones', render: (item: Product) => (
       <div className="flex gap-2">
         {activeTab === 'active' && <button onClick={() => setSuppliersTarget(item)} className="text-gray-500 hover:text-primary-600" title="Ver proveedores"><Truck size={16} /></button>}
@@ -687,6 +690,7 @@ export function ProductsPage() {
         </div>
       </div>
 
+      {data?.data?.some(item => item.catalogStatus === 'PENDING_REVIEW') && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Los productos importados están en el catálogo. Abre «Editar» para completar precios, unidad e IGV antes de venderlos. El conteo del Excel aún no se ha aplicado al stock.</div>}
       {/* Filtros */}
       <div className="mb-4 space-y-2">
         {/* Fila principal: buscador + botón filtros (mobile) */}
@@ -759,7 +763,7 @@ export function ProductsPage() {
             ? item.activeIngredients
             : item.activeIngredient ? [{ name: item.activeIngredient, concentration: '' }] : [];
           const displayPrices = getPricesForDisplay(item);
-          const taxColor = item.taxType === 'EXONERADO'
+          const taxColor = item.taxType === 'PENDIENTE' ? 'bg-amber-100 text-amber-800' : item.taxType === 'EXONERADO'
             ? 'bg-yellow-100 text-yellow-800'
             : item.taxType === 'INAFECTO' ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800';
           const taxLabel = TAX_TYPES.find(t => t.value === (item.taxType || 'GRAVADO'))?.label || 'Gravado';
@@ -785,8 +789,8 @@ export function ProductsPage() {
                     );
                   })()}
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${item.isActive ? 'bg-primary-100 text-primary-800' : 'bg-red-100 text-red-800'}`}>
-                  {item.isActive ? 'Activo' : 'Inactivo'}
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${!item.isActive ? 'bg-red-100 text-red-800' : item.catalogStatus === 'PENDING_REVIEW' ? 'bg-amber-100 text-amber-800' : 'bg-primary-100 text-primary-800'}`}>
+                  {!item.isActive ? 'Inactivo' : item.catalogStatus === 'PENDING_REVIEW' ? 'Pendiente de completar' : 'Activo'}
                 </span>
               </div>
 
@@ -872,6 +876,7 @@ export function ProductsPage() {
       <Pagination page={page} totalPages={Math.ceil(total / 20)} onPageChange={(p) => setParams({ page: p > 1 ? String(p) : '' })} />
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editing ? 'Editar Producto' : 'Nuevo Producto'} size="lg">
         <form onSubmit={handleSubmit} className="space-y-4">
+          {editing && <ProductCatalogReview product={editing} />}
           {editing && (
             <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
               <div className="flex-shrink-0">
@@ -981,6 +986,7 @@ export function ProductsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Unidad</label>
               <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required>
                 <option value="">Seleccionar...</option>
+                <option value="PENDIENTE">Unidad por confirmar</option>
                 {allUnits.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
               </select>
             </div>

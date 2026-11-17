@@ -22,7 +22,10 @@ export function LoginPage() {
       toast.success('Bienvenido');
     } catch (err: any) {
       const msg = err.response?.data?.message;
-      const errorMsg = Array.isArray(msg) ? msg[0] : (msg || 'Credenciales inválidas');
+      const fallback = err.response?.status === 401
+        ? 'Credenciales inválidas'
+        : err.response ? 'No se pudo iniciar sesión. Intenta nuevamente.' : 'No se pudo conectar al servidor. Revisa tu conexión e intenta nuevamente.';
+      const errorMsg = Array.isArray(msg) ? (msg[0] || fallback) : (msg || fallback);
       toast.error(errorMsg, { duration: 4000 });
     } finally {
       setLoading(false);

@@ -1,7 +1,7 @@
 import { api } from './api';
 
 export interface DniResult { nombre: string; apellidoPaterno: string; apellidoMaterno: string; nombreCompleto: string; }
-export interface RucResult { razonSocial: string; direccion: string; estado: string; }
+export interface RucResult { razonSocial: string; direccion: string; estado: string; condicion?: string; }
 export interface TipoCambioResult { compra: number; venta: number; fecha: string; }
 
 export const lookupService = {

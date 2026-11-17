@@ -10,6 +10,7 @@ import {
   PackageSearch,
 } from 'lucide-react';
 import type { AccountPayable } from '../types';
+import { BranchSelector } from './BranchSelector';
 import { BrandLogo } from './BrandLogo';
 
 type NavItem = { path: string; label: string; icon: any; roles?: string[] };
@@ -46,7 +47,8 @@ const navSections: NavSection[] = [
       { path: '/cash-register', label: 'Caja', icon: Wallet },
       { path: '/credits', label: 'Créditos', icon: CreditCard },
       { path: '/accounts-payable', label: 'Cuentas por Pagar', icon: FileText },
-      { path: '/invoices', label: 'Facturas', icon: Receipt },
+      { path: '/billing', label: 'Facturación', icon: Receipt },
+      { path: '/invoices', label: 'Documentos de compras', icon: FileText },
     ],
   },
   {
@@ -165,19 +167,6 @@ export function Layout() {
           </button>
         </div>
 
-        {branches.length > 0 && (
-          <div className="px-3 pt-3">
-            <label className="block px-2 mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Sucursal activa</label>
-            <select
-              value={selectedBranch?.id || ''}
-              onChange={(event) => selectBranch(event.target.value)}
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-            >
-              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.code} · {branch.name}</option>)}
-            </select>
-          </div>
-        )}
-
         <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-5">
           {navSections.map((section) => {
             const visibleItems = section.items.filter(
@@ -245,7 +234,7 @@ export function Layout() {
       )}
 
       <div className="flex-1 flex flex-col min-h-screen min-w-0">
-        <header className="h-16 bg-primary-600 flex items-center justify-between px-4 lg:px-6">
+        <header className="h-16 bg-primary-600 flex items-center justify-between gap-3 px-4 lg:px-6">
           <div className="flex items-center gap-3">
             <button onClick={() => setSidebarOpen(true)} className="hidden">
               <Menu size={20} />
@@ -256,13 +245,10 @@ export function Layout() {
             </Link>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 bg-white/15 hover:bg-white/25 transition-colors border border-white/20 rounded-full px-4 py-1.5 cursor-default">
-              <span className="w-2 h-2 rounded-full bg-green-300 shadow-[0_0_6px_2px_rgba(134,239,172,0.6)]"></span>
-              <span className="text-white text-sm font-semibold tracking-wide">Vista general</span>
-            </div>
+          <div className="flex min-w-0 flex-1 justify-end items-center gap-2 sm:gap-3">
+            <BranchSelector branches={branches} selectedBranch={selectedBranch} onSelect={selectBranch} />
 
-            <div className="relative" ref={bellRef}>
+            <div className="relative shrink-0" ref={bellRef}>
               <button
                 onClick={() => setBellOpen(!bellOpen)}
                 className="relative w-10 h-10 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white transition-colors"
