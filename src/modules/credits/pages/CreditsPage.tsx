@@ -250,7 +250,7 @@ export function CreditsPage() {
                           onClick={() => openBatchForGroup(group)}
                           className="flex items-center gap-1 px-2.5 py-1.5 bg-primary-600 text-white text-xs font-semibold rounded-lg hover:bg-primary-700 transition-colors"
                         >
-                          <DollarSign size={13} /> Pagar
+                          <DollarSign size={13} /> Registrar abono
                         </button>
                       )}
                       <button

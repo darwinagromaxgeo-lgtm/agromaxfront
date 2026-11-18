@@ -98,7 +98,7 @@ export function ClientCreditDetailPage() {
               onClick={() => setShowBatch(true)}
               className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm"
             >
-              <DollarSign size={16} /> Pagar al cliente
+              <DollarSign size={16} /> Registrar abono
             </button>
           )}
         </div>

@@ -25,6 +25,8 @@ import { recipientFormError, recipientFormFromParty, recipientParty, type Recipi
 import { saleNoteDocument } from '../../sales/utils/saleNoteDocument';
 import { CheckoutBillingResult } from '../components/CheckoutBillingResult';
 import { checkoutDocuments, emitCheckoutDocuments } from '../services/posBilling';
+import { CheckoutClientForm } from '../components/CheckoutClientForm';
+import { creditCheckout } from '../utils/creditCheckout';
 
 const IGV_RATE = 0.18;
 
@@ -170,11 +172,13 @@ export function POSPage() {
     );
   }, [companiesData, selectedBranch]);
 
+  const [checkoutClients, setCheckoutClients] = useState<Client[]>([]);
+  const [showNewClient, setShowNewClient] = useState(false);
   const clients: Client[] = useMemo(() => {
     const raw: any = clientsData;
     const list: Client[] = Array.isArray(raw) ? raw : raw?.data || [];
-    return list.filter((c) => c.isActive);
-  }, [clientsData]);
+    return [...new Map([...list, ...checkoutClients].filter(c => c.isActive && c.branchId === selectedBranch?.id).map(c => [c.id, c])).values()];
+  }, [clientsData, checkoutClients, selectedBranch?.id]);
 
   const tiers: PriceTier[] = useMemo(() => {
     const list: PriceTier[] = Array.isArray(priceTiers) ? priceTiers : [];
@@ -237,6 +241,16 @@ export function POSPage() {
   const fiscalReady = !fiscalBlockReason;
   const canSwitchToFactura = voucherType === 'BOLETA' && fiscalStatus?.ready && issuerMatchesCompany && fiscalStatus.supportedDocumentTypes.includes('FACTURA');
   const selectedParty = (id: string) => { const client = clients.find(item => item.id === id); const number = client?.documentNumber || ''; return client ? { name: client.name, documentType: (number.length === 11 ? 'RUC' : number.length === 8 ? 'DNI' : 'UNIDENTIFIED') as BillingParty['documentType'], documentNumber: number || undefined, address: client.address, email: client.email } : undefined; };
+  const selectCheckoutClient = (client: Client | undefined) => {
+    setClientId(client?.id || '');
+    setCreditAccountId('new');
+    setCreditName('');
+    if (!client) setIsCredit(false);
+    if (voucherType !== 'NONE') {
+      const number = client?.documentNumber || '';
+      setRecipient(recipientFormFromParty(client ? { name: client.name, documentType: number.length === 11 ? 'RUC' : number.length === 8 ? 'DNI' : 'UNIDENTIFIED', documentNumber: number || undefined, address: client.address, email: client.email } : undefined, voucherType));
+    }
+  };
   const chooseVoucher = (value: 'NONE' | 'BOLETA' | 'FACTURA') => { setVoucherType(value); if (value !== 'NONE') setRecipient(recipientFormFromParty(selectedParty(clientId), value)); };
   const closeCheckout = () => { if (checkoutBusy) return; setShowCheckout(false); setCheckoutResult(null); };
   const billingError = (error: any) => { const message = error?.response?.data?.message; return Array.isArray(message) ? message.join(' ') : typeof message === 'string' ? message : error?.message || 'No se pudo confirmar la emisión. Actualiza su resultado.'; };
@@ -263,6 +277,9 @@ export function POSPage() {
   const [isCredit, setIsCredit] = useState(false);
   const [creditAccountId, setCreditAccountId] = useState<string>('new');
   const [creditName, setCreditName] = useState('');
+  const [hasInitialPayment, setHasInitialPayment] = useState(false);
+  const [initialPaymentAmount, setInitialPaymentAmount] = useState('');
+  const [initialPaymentMethodId, setInitialPaymentMethodId] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   const catRowRef = useRef<HTMLDivElement>(null);
   const subRowRef = useRef<HTMLDivElement>(null);
@@ -545,6 +562,8 @@ export function POSPage() {
   const subtotal = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
   const igv = subtotal * IGV_RATE;
   const total = subtotal;
+  const creditPayment = creditCheckout(total, hasInitialPayment, initialPaymentAmount, initialPaymentMethodId);
+  const selectedCredit = (openCredits as CreditAccount[] | undefined)?.find(credit => credit.id === creditAccountId);
   const headerLines = checkoutResult?.sale.items || cart.map(item => ({ subtotal: item.quantity * item.unitPrice, taxType: item.taxType || 'GRAVADO', taxRate: IGV_RATE }));
   const headerBase = headerLines.reduce((sum, item) => sum + (item.taxType === 'GRAVADO' ? Math.round(Math.round(item.subtotal * 100) / (1 + (item.taxRate ?? IGV_RATE))) : Math.round(item.subtotal * 100)), 0) / 100;
   const headerTax = Math.round(((checkoutResult?.sale.total ?? total) - headerBase) * 100) / 100;
@@ -561,6 +580,10 @@ export function POSPage() {
     setIsCredit(false);
     setCreditAccountId('new');
     setCreditName('');
+    setShowNewClient(false);
+    setHasInitialPayment(false);
+    setInitialPaymentAmount('');
+    setInitialPaymentMethodId(paymentMethodId);
     setSplitPayments([{ paymentMethodId, amount: 0 }]);
     setRecipient(recipientFormFromParty(selectedParty(clientId), voucherType === 'FACTURA' ? 'FACTURA' : 'BOLETA'));
     setCheckoutResult(null); setShowCheckout(true);
@@ -584,7 +607,7 @@ export function POSPage() {
   ));
 
   const confirmSale = async () => {
-    if (checkoutLock.current) return;
+    if (checkoutLock.current || showNewClient) return;
     const receiver = voucherType === 'NONE' ? undefined : recipientParty(recipient);
     if (voucherType !== 'NONE') {
       const error = recipientFormError(recipient, total); if (error) { toast.error(error); return; }
@@ -595,6 +618,8 @@ export function POSPage() {
     if (isCredit) {
       if (!clientId) { toast.error('Selecciona un cliente para la venta a crédito'); return; }
       if (creditAccountId === 'new' && !creditName.trim()) { toast.error('Ingresa un nombre para la cuenta de crédito'); return; }
+      if (creditPayment.error) { toast.error(creditPayment.error); return; }
+      payloadPayments = creditPayment.payments;
     } else {
       const validPayments = splitPayments.filter(p => p.paymentMethodId && p.amount > 0);
       if (validPayments.length === 0) { toast.error('Ingresa al menos un método de pago con monto'); return; }
@@ -646,6 +671,8 @@ export function POSPage() {
             clientId: clientId || undefined,
             voucherType,
             isCredit,
+            creditAccountId: isCredit && creditAccountId !== 'new' ? creditAccountId : undefined,
+            creditName: isCredit && creditAccountId === 'new' ? creditName.trim() : undefined,
             payments: payloadPayments,
           },
         });
@@ -677,6 +704,8 @@ export function POSPage() {
       setIsCredit(false);
       setCreditAccountId('new');
       setCreditName('');
+      setHasInitialPayment(false);
+      setInitialPaymentAmount('');
       if (sourceQuoteId) {
         setSourceQuoteId('');
         setSearchParams({});
@@ -1553,19 +1582,27 @@ export function POSPage() {
 
               {/* 1. Cliente */}
               <div>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
                   <span className="w-6 h-6 rounded-full bg-primary-100 text-primary-700 text-xs font-bold flex items-center justify-center shrink-0">1</span>
                   <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Cliente</span>
-                  <span className="text-xs text-gray-400 font-normal normal-case">opcional</span>
+                  <span className="text-xs text-gray-500 font-normal normal-case">{isCredit ? 'requerido' : 'opcional'}</span>
+                  <button type="button" disabled={showNewClient} onClick={() => setShowNewClient(true)} className="ml-auto inline-flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-2 text-sm font-bold text-primary-700 hover:bg-primary-100 disabled:opacity-50"><Plus size={16} /> Nuevo cliente</button>
                 </div>
                 <select
                   value={clientId}
-                  onChange={(e) => { setClientId(e.target.value); if (!e.target.value) setIsCredit(false); if (voucherType !== 'NONE') setRecipient(recipientFormFromParty(selectedParty(e.target.value), voucherType)); }}
+                  disabled={showNewClient}
+                  aria-label="Cliente de la venta"
+                  onChange={(e) => selectCheckoutClient(clients.find(client => client.id === e.target.value))}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-400 bg-white"
                 >
                   <option value="">— Consumidor final —</option>
                   {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+                {showNewClient && <CheckoutClientForm onCancel={() => setShowNewClient(false)} onSelect={client => {
+                  setCheckoutClients(previous => [...previous.filter(item => item.id !== client.id), client]);
+                  selectCheckoutClient(client);
+                  setShowNewClient(false);
+                }} />}
               </div>
 
               <div className="border-t border-gray-100" />
@@ -1665,6 +1702,7 @@ export function POSPage() {
                     </div>
                     {creditAccountId === 'new' && (
                       <input
+                        aria-label="Nombre de la cuenta de crédito"
                         value={creditName}
                         onChange={(e) => setCreditName(e.target.value)}
                         placeholder="Nombre de la cuenta  (ej: Tomates, Maíz)"
@@ -1673,6 +1711,27 @@ export function POSPage() {
                       />
                     )}
                   </div>
+                  <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3">
+                    <label className="flex items-center gap-2 text-sm font-bold text-orange-900"><input type="checkbox" checked={hasInitialPayment} onChange={event => setHasInitialPayment(event.target.checked)} className="h-4 w-4 accent-orange-600" /> Recibir abono inicial</label>
+                    <p className="text-xs text-gray-700">Si el cliente deja algo a cuenta, regístralo aquí. El resto quedará pendiente en Créditos.</p>
+                    {hasInitialPayment && <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="text-sm font-medium text-gray-800">Monto del abono (S/)
+                        <input type="number" inputMode="decimal" min="0.01" step="0.01" value={initialPaymentAmount} onChange={event => setInitialPaymentAmount(event.target.value)} className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2" placeholder="0.00" />
+                      </label>
+                      <label className="text-sm font-medium text-gray-800">Método del abono
+                        <select value={initialPaymentMethodId} onChange={event => setInitialPaymentMethodId(event.target.value)} className="mt-1 w-full rounded-lg border border-orange-200 bg-white px-3 py-2"><option value="">Selecciona un método</option>{paymentMethods.map(method => <option key={method.id} value={method.id}>{method.name}</option>)}</select>
+                      </label>
+                    </div>}
+                    {creditPayment.error && <p role="alert" className="text-sm font-medium text-red-700">{creditPayment.error}</p>}
+                    <dl className="space-y-1 text-sm text-gray-800">
+                      <div className="flex justify-between gap-2"><dt>Total de la venta</dt><dd className="font-bold">S/ {total.toFixed(2)}</dd></div>
+                      <div className="flex justify-between gap-2"><dt>Abono inicial</dt><dd className="font-bold">S/ {creditPayment.deposit.toFixed(2)}</dd></div>
+                      <div className="flex justify-between gap-2 border-t border-orange-200 pt-2 text-base"><dt className="font-bold">Saldo de esta venta</dt><dd className="font-bold">S/ {creditPayment.pending.toFixed(2)}</dd></div>
+                      {selectedCredit && <div className="flex justify-between gap-2"><dt>Saldo total de la cuenta</dt><dd className="font-bold">S/ {(selectedCredit.pendingAmount + creditPayment.pending).toFixed(2)}</dd></div>}
+                    </dl>
+                    <p className="text-xs text-gray-700">Los siguientes abonos se registran en Créditos → cliente → Registrar abono.</p>
+                  </div>
+                  {voucherType !== 'NONE' && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">Se registrarán la venta, el crédito y el abono. El comprobante quedará pendiente de emisión hasta configurar las cuotas fiscales.</p>}
                 </>
               )}
 
@@ -1788,7 +1847,7 @@ export function POSPage() {
               <button
                 onClick={confirmSale}
                 aria-describedby={voucherType !== 'NONE' && !isCredit && !fiscalReady ? 'checkout-fiscal-block' : undefined}
-                disabled={checkoutBusy || (voucherType !== 'NONE' && (!!recipientFormError(recipient, total) || (!isCredit && !fiscalReady)))}
+                disabled={checkoutBusy || showNewClient || (isCredit && !!creditPayment.error) || (voucherType !== 'NONE' && (!!recipientFormError(recipient, total) || (!isCredit && !fiscalReady)))}
                 className={`w-full py-4 text-white rounded-xl disabled:opacity-50 font-bold text-lg transition-colors shadow-sm flex items-center justify-center gap-2 ${
                   isCredit ? 'bg-orange-500 hover:bg-orange-600' : 'bg-primary-600 hover:bg-primary-700'
                 }`}

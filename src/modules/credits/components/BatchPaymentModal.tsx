@@ -156,7 +156,7 @@ export function BatchPaymentModal({ isOpen, onClose, clientId, clientName, openC
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Pagar — ${clientName}`} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Registrar abono — ${clientName}`} size="xl">
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-between">
           <div>

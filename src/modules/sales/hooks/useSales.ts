@@ -17,6 +17,7 @@ export function useCreateSale() {
       qc.invalidateQueries({ queryKey: ['kardex'] });
       qc.invalidateQueries({ queryKey: ['cash-register-today'] });
       qc.invalidateQueries({ queryKey: ['credits'] });
+      qc.invalidateQueries({ queryKey: ['credit'] });
       toast.success('Venta registrada');
     },
     onError: (err: any) => toast.error(err.response?.data?.message?.[0] || 'Error'),

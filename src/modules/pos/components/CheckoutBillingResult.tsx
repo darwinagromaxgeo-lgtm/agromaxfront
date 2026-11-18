@@ -1,4 +1,5 @@
 import { CheckCircle2, Eye, FileText, Loader2, RefreshCw } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { Sale } from '../../../shared/types';
 import type { BillingDocument } from '../../billing/types';
 import type { BillingPrintDocument } from '../../billing/utils/printTypes';
@@ -8,8 +9,11 @@ export function CheckoutBillingResult({ sale, documents, busy, error, onPreview,
   sale: Sale; documents: BillingDocument[]; busy: boolean; error?: string; note?: BillingPrintDocument;
   onPreview: (document: BillingPrintDocument) => void; onRefresh: () => void;
 }) {
+  const deposit = sale.payments.reduce((sum, payment) => sum + Math.round(payment.amount * 100), 0) / 100;
+  const pending = (Math.round(sale.total * 100) - Math.round(deposit * 100)) / 100;
   return <div className="space-y-4">
     <div className="flex items-start gap-3 rounded-xl bg-primary-50 p-4"><CheckCircle2 size={22} className="shrink-0 text-primary-600" /><div><p className="font-bold text-primary-900">Venta registrada</p><p className="mt-1 text-xs text-primary-700">Referencia {sale.id.slice(-8).toUpperCase()} · S/ {sale.total.toFixed(2)}</p></div></div>
+    {sale.isCredit && <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm text-gray-800"><p>Abono inicial registrado: <strong>S/ {deposit.toFixed(2)}</strong></p><p className="mt-1">Saldo de esta venta al registrarla: <strong>S/ {pending.toFixed(2)}</strong></p><p className="mt-2">Puedes registrar los siguientes abonos en Créditos, dentro del cliente.</p>{sale.clientId && !busy && <Link to={`/credits/client/${sale.clientId}`} className="mt-3 inline-block font-bold text-orange-900 underline">Ver créditos del cliente</Link>}</div>}
     {busy && <p role="status" className="flex items-center gap-2 text-sm text-slate-600"><Loader2 size={16} className="animate-spin" /> Procesando comprobante…</p>}
     {error && <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{error}<span className="mt-2 block text-xs">La venta ya está guardada. Continuar la emisión utiliza esta misma venta.</span></p>}
     {note && <div className="rounded-xl border border-slate-200 p-4"><p className="flex items-center gap-2 font-bold text-slate-800"><FileText size={18} /> Nota de venta</p><p className="mt-1 text-xs text-slate-500">Documento interno. Sin envío a SUNAT.</p><button onClick={() => onPreview(note)} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-primary-200 px-3 py-2 text-sm font-semibold text-primary-700"><Eye size={15} /> Ver A4 y ticket</button></div>}

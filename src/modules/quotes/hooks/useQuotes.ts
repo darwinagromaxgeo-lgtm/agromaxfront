@@ -36,6 +36,11 @@ export function useConvertQuote() {
       qc.invalidateQueries({ queryKey: ['quotes'] });
       qc.invalidateQueries({ queryKey: ['sales'] });
       qc.invalidateQueries({ queryKey: ['stock'] });
+      qc.invalidateQueries({ queryKey: ['credits'] });
+      qc.invalidateQueries({ queryKey: ['credit'] });
+      qc.invalidateQueries({ queryKey: ['cash-register-today'] });
+      qc.invalidateQueries({ queryKey: ['product-lots'] });
+      qc.invalidateQueries({ queryKey: ['kardex'] });
       toast.success('Cotización convertida en venta');
     },
     onError: (err: any) => toast.error(err.response?.data?.message?.[0] || err.response?.data?.message || 'Error al convertir'),

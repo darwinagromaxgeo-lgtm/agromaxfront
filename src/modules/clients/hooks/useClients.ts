@@ -7,7 +7,7 @@ export function useClients(params?: any) {
 }
 export function useCreateClient() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: clientService.create, onSuccess: () => { qc.invalidateQueries({ queryKey: ['clients'] }); toast.success('Cliente creado'); }, onError: (err: any) => toast.error(err.response?.data?.message?.[0] || 'Error') });
+  return useMutation({ mutationFn: clientService.create, onSuccess: () => { qc.invalidateQueries({ queryKey: ['clients'] }); toast.success('Cliente creado'); }, onError: (err: any) => { const message = err.response?.data?.message; toast.error(Array.isArray(message) ? message.join(' ') : message || 'No se pudo crear el cliente'); } });
 }
 export function useUpdateClient() {
   const qc = useQueryClient();
