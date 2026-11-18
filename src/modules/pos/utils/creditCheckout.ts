@@ -1,3 +1,8 @@
+export function checkoutTotal(items: { quantity: number; unitPrice: number }[]) {
+  // Match the stored sale: round each line to cents before adding the total.
+  return items.reduce((cents, item) => cents + Math.round(item.quantity * item.unitPrice * 100), 0) / 100;
+}
+
 export function creditCheckout(total: number, hasDeposit: boolean, amount: string, paymentMethodId: string) {
   if (!hasDeposit) return { payments: [], deposit: 0, pending: total, error: undefined };
   const deposit = Number(amount);

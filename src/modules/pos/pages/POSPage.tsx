@@ -26,7 +26,7 @@ import { saleNoteDocument } from '../../sales/utils/saleNoteDocument';
 import { CheckoutBillingResult } from '../components/CheckoutBillingResult';
 import { checkoutDocuments, emitCheckoutDocuments } from '../services/posBilling';
 import { CheckoutClientForm } from '../components/CheckoutClientForm';
-import { creditCheckout } from '../utils/creditCheckout';
+import { checkoutTotal, creditCheckout } from '../utils/creditCheckout';
 
 const IGV_RATE = 0.18;
 
@@ -559,7 +559,7 @@ export function POSPage() {
 
   const [editingPriceFor, setEditingPriceFor] = useState<string | null>(null);
 
-  const subtotal = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+  const subtotal = checkoutTotal(cart);
   const igv = subtotal * IGV_RATE;
   const total = subtotal;
   const creditPayment = creditCheckout(total, hasInitialPayment, initialPaymentAmount, initialPaymentMethodId);
