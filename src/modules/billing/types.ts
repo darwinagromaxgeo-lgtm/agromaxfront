@@ -72,6 +72,7 @@ export interface BillingProviderStatus {
   boletaSubmissionMode?: 'individual' | 'summary';
   series?: { FACTURA: string; BOLETA: string };
   supportedDocumentTypes: BillingDocumentType[];
+  creditNotes?: { ready:boolean; series:{ FACTURA:string; BOLETA:string }; message:string };
   message: string;
 }
 
@@ -86,4 +87,27 @@ export interface BillingSimulation {
   dataReady: boolean;
   message: string;
   service?: { verified: boolean; message: string; pdfBase64?: string; xmlBase64?: string };
+}
+
+export interface BillingCreditNote extends Omit<BillingDocument,'documentType'|'items'> {
+  documentType:'NOTA_CREDITO';
+  originalDocumentId:string;
+  originalDocumentType:BillingDocumentType;
+  originalSeries:string;
+  originalNumber:number;
+  originalIssuedAt:string;
+  reasonCode:'06'|'07';
+  reasonDescription:string;
+  items:(BillingItem & { originalItemIndex:number })[];
+}
+export interface CreditNoteInput {
+  originalDocumentId:string;
+  returnType:'TOTAL'|'PARTIAL';
+  reason:string;
+  items?:{ itemIndex:number; quantity:number }[];
+}
+export interface CreditNoteAvailability {
+  original:BillingDocument;
+  items:(BillingItem & { itemIndex:number; creditedQuantity:number; availableQuantity:number; availableAmount:number })[];
+  notes:BillingCreditNote[];
 }

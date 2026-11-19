@@ -17,6 +17,7 @@ export function BillingDocumentPaper({ document, format, options = {} }: {
       <div><p className="billing-sheet-caption">CLIENTE</p><strong>{document.receiver.name}</strong><p>{document.receiver.documentType === 'UNIDENTIFIED' ? 'Documento' : document.receiver.documentType}: {document.receiver.documentNumber || 'Sin identificación'}</p>{document.receiver.address && <p>{document.receiver.address}</p>}</div>
       <div className="billing-sheet-meta"><p><span>Fecha</span><b>{view.date}</b></p><p><span>Condición de pago</span><b>{view.payment}</b></p><p><span>Afectación</span><b>{view.tax}</b></p></div>
     </section>
+    {document.documentType === 'NOTA_CREDITO' && <section className="billing-sheet-customer"><div><p>Comprobante afectado: <strong>{document.originalSeries}-{String(document.originalNumber).padStart(8,'0')}</strong></p><p>Motivo {document.reasonCode}: {document.reasonDescription}</p></div></section>}
     <table className="billing-sheet-items">
       <thead><tr><th>{ticket ? 'DETALLE' : 'DESCRIPCIÓN'}</th>{!ticket && <><th>CANT.</th><th>UND.</th><th>P. UNIT.</th></>}<th>IMPORTE</th></tr></thead>
       <tbody>{document.items.map((item, index) => <tr key={`${item.productId}-${index}`}>
@@ -30,7 +31,7 @@ export function BillingDocumentPaper({ document, format, options = {} }: {
       {(!ticket || document.exemptAmount > 0) && <p><span>Op. exoneradas</span><b>{billingMoney(document.exemptAmount)}</b></p>}
       {(!ticket || document.unaffectedAmount > 0) && <p><span>Op. inafectas</span><b>{billingMoney(document.unaffectedAmount)}</b></p>}
       <p><span>IGV</span><b>{billingMoney(document.taxAmount)}</b></p>
-      <p className="billing-sheet-grand-total"><span>TOTAL A PAGAR</span><b>{billingMoney(document.total)}</b></p>
+      <p className="billing-sheet-grand-total"><span>{document.documentType === 'NOTA_CREDITO' ? 'TOTAL A ACREDITAR' : 'TOTAL A PAGAR'}</span><b>{billingMoney(document.total)}</b></p>
     </section>
     <footer className="billing-sheet-footer"><p className={view.nonFiscal ? 'billing-sheet-notice' : ''}>{view.notice}</p>{!view.nonFiscal && document.hash && <p className="billing-sheet-hash">Hash: {document.hash}</p>}<p className="billing-sheet-thanks">Gracias por tu compra</p><p>Agromax · Innovando la agricultura</p></footer>
   </article>;

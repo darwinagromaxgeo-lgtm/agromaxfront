@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { AlertTriangle, Download, Eye, FileCheck2, FileText, FlaskConical, Loader2, Plus, RefreshCw, Search, Send, Trash2 } from 'lucide-react';
+import { AlertTriangle, Download, Eye, FileCheck2, FileText, FlaskConical, Loader2, Plus, RefreshCw, Search, Send, Trash2, Undo2 } from 'lucide-react';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { Modal } from '../../../shared/components/Modal';
 import { Pagination } from '../../../shared/components/Pagination';
@@ -14,6 +14,7 @@ import { billingService } from '../services/billingService';
 import { downloadBillingDraft } from '../utils/draftPdf';
 import { BillingPreviewModal } from '../components/BillingPreviewModal';
 import { BillingRecipientForm } from '../components/BillingRecipientForm';
+import { CreditNotesPanel } from '../components/CreditNotesPanel';
 import { recipientDocumentType, recipientFormError, recipientFormFromParty, recipientParty, type RecipientFormState } from '../utils/recipientForm';
 import { billingFormatExample } from '../utils/exampleDocument';
 import type { BillingPrintDocumentType } from '../utils/printTypes';
@@ -97,6 +98,8 @@ export function BillingPage() {
   const role = user?.role === 'ADMIN' ? 'ADMIN' : user?.branchAssignments?.find(assignment => assignment.branchId === branchId)?.role || user?.role;
   const allowed = !!branchId && (role === 'ADMIN' || role === 'VENDEDOR');
   const [page, setPage] = useState(1);
+  const [notesView,setNotesView]=useState(false);
+  const [creditOriginalId,setCreditOriginalId]=useState('');
   const [startDate, setStartDate] = useState(() => `${today().slice(0, 7)}-01`);
   const [endDate, setEndDate] = useState(today);
   const [companyId, setCompanyId] = useState('');
@@ -123,6 +126,7 @@ export function BillingPage() {
   const [exampleType, setExampleType] = useState<BillingPrintDocumentType>('BOLETA');
 
   useEffect(() => {
+    setNotesView(false);setCreditOriginalId('');
     setPage(1); setCreateOpen(false); setDetailId(null); setSaleId(''); setGroupKey(''); setIssueOpen(false); setDiscardOpen(false); setFormatPreview(null); setExampleOpen(false);
   }, [branchId]);
   useEffect(() => { setPage(1); }, [startDate, endDate, companyId, type, status]);
@@ -183,8 +187,10 @@ export function BillingPage() {
     try { await downloadBillingDraft(draft, simulated); } catch { toast.error('No se pudo generar el PDF'); } finally { setDownloading(false); }
   };
   if (!allowed) return <div className="rounded-xl bg-white border p-6 text-gray-600">Selecciona una sucursal con acceso de administrador o vendedor para abrir Facturación.</div>;
+  if (notesView) return <div className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-bold text-gray-800">Facturación</h1><div className="flex gap-2"><button className={buttonClass} onClick={()=>setNotesView(false)}>Ver comprobantes</button><button className={buttonClass} onClick={()=>connection.refetch()} disabled={connection.isFetching}><RefreshCw size={14} /> Verificar conexión</button></div></div><CreditNotesPanel key={branchId} branchId={branchId!} connection={connection.data} initialOriginalId={creditOriginalId} onOriginalConsumed={()=>setCreditOriginalId('')} /></div>;
 
   return <div className="space-y-5">
+    <div><button className={buttonClass} onClick={()=>setNotesView(true)}><Undo2 size={16} /> Notas de crédito</button></div>
     <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><FileCheck2 size={25} /> Facturación</h1><p className="text-sm text-gray-500 mt-1">Comprobantes de venta separados por empresa y afectación tributaria.</p></div><div className="flex flex-wrap gap-2"><button className={buttonClass} onClick={() => { setFormatPreview(null); setExampleOpen(true); }}><Eye size={17} /> Ver formatos</button><button className={primaryClass} onClick={() => { setSaleId(''); setGroupKey(''); setSalePage(1); setRecipient(recipientFormFromParty()); setRecipientTouched(false); setCreateOpen(true); }}><Plus size={17} /> Preparar comprobante</button></div></div>
     <div className={`rounded-xl border p-4 ${connection.data?.ready ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
       <div className="flex flex-wrap justify-between gap-3"><div><p className="font-semibold text-sm">{connection.isFetching ? 'Comprobando conexión…' : connection.data?.simulationReady ? 'Microservicio de simulación disponible' : connection.data?.ready ? 'Servicio de facturación disponible' : 'Preparación de comprobantes disponible'}</p><p className="text-sm mt-1">{connection.error ? 'No se pudo consultar el servicio. Revisa la conexión con el backend.' : connection.data?.message}</p>{connection.data?.issuerRuc && <p className="text-xs mt-2">Emisor: {connection.data.issuerName || connection.data.issuerRuc} · RUC {connection.data.issuerRuc} · {connection.data.environment === 'simulation' ? 'Simulación' : connection.data.environment === 'production' ? 'Producción' : 'Pruebas'}</p>}</div><button className={buttonClass} onClick={() => connection.refetch()} disabled={connection.isFetching}><RefreshCw size={14} /> Verificar conexión</button></div>
@@ -221,6 +227,7 @@ export function BillingPage() {
       {detail.isLoading ? <p>Cargando…</p> : detail.error ? <p className="text-red-700">{apiError(detail.error)}</p> : document && <div className="space-y-5"><button className={buttonClass} onClick={() => setFormatPreview({ document })}><Eye size={16} /> Vista A4 y ticket</button><DocumentSummary document={document} /><IdentityCheck key={`${branchId}:${document.id}`} document={document} />
       {simulationResult && document.status === 'DRAFT' && <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3"><p className="font-bold text-blue-900">SIMULACIÓN · SIN VALIDEZ TRIBUTARIA</p><button className={buttonClass} onClick={() => setFormatPreview({ document: simulationResult.document, simulation: true })}><Eye size={16} /> Ver simulación en A4 y ticket</button><p className="text-sm">{simulationResult.message}</p>{simulationResult.service && <p className="text-sm font-medium">{simulationResult.service.message}</p>}<ul className="space-y-2 text-sm">{simulationResult.checks.map(check => <li key={check.label}><span className="font-semibold">{check.passed ? '✓' : 'Pendiente:'} {check.label}.</span> {check.detail}</li>)}</ul><button className={buttonClass} disabled={downloading} onClick={() => simulationResult.service?.verified ? billingService.downloadSimulation(simulationResult, 'pdf') : downloadDraft(simulationResult.document, true)}><Download size={15} /> Descargar PDF de simulación</button>{simulationResult.service?.verified && <button className={`${buttonClass} ml-2`} onClick={() => billingService.downloadSimulation(simulationResult, 'xml')}><Download size={15} /> XML de simulación</button>}</div>}
       <div className="flex flex-wrap gap-2">
+        {document.status==='ACCEPTED' && <button className={buttonClass} onClick={()=>{setCreditOriginalId(document.id);setDetailId(null);setNotesView(true);}}><Undo2 size={15} /> Crear nota de crédito por devolución</button>}
         {document.status === 'DRAFT' && <button className={primaryClass} disabled={simulation.isPending} onClick={() => simulation.mutate(document.id)}><FlaskConical size={15} /> {simulation.isPending ? 'Simulando…' : 'Simular sin enviar'}</button>}
         {document.status === 'DRAFT' && <><button className={buttonClass} disabled={downloading} onClick={() => downloadDraft(document)}><Download size={15} /> PDF de borrador</button><button className={`${buttonClass} text-red-600`} onClick={() => { setDiscardReason(''); setDiscardOpen(true); }}><Trash2 size={15} /> Descartar borrador</button><button className={primaryClass} disabled={issue.isPending || saveReceiver.isPending} onClick={() => { setIssueRecipient(recipientFormFromParty(document.receiver, document.documentType)); setIssueStep('receiver'); setIssueConfirmed(false); setIssueOpen(true); }}><Send size={15} /> Preparar envío</button></>}
         {document.status === 'PENDING' && <button className={primaryClass} disabled={check.isPending} onClick={() => check.mutate(document.id)}><RefreshCw size={15} /> {check.isPending ? 'Consultando…' : 'Consultar estado SUNAT'}</button>}

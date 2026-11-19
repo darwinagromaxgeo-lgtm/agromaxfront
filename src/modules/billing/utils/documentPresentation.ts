@@ -25,9 +25,9 @@ export function billingPresentation(document: BillingPrintDocument, options: Bil
             : document.status === 'REJECTED' ? 'Comprobante rechazado. Sin validez tributaria.'
               : 'La aceptación por SUNAT aún no está confirmada. Consulta el estado del comprobante.';
   const qr = !nonFiscal && document.hash && document.series && document.number && validDate
-    ? [document.issuer.documentNumber, document.documentType === 'FACTURA' ? '01' : '03', document.series, String(document.number), document.taxAmount.toFixed(2), document.total.toFixed(2), issued.toLocaleDateString('en-CA', { timeZone: 'America/Lima' }), document.receiver.documentType === 'RUC' ? '6' : document.receiver.documentType === 'DNI' ? '1' : '-', document.receiver.documentNumber || '-', document.hash].join('|') : undefined;
+    ? [document.issuer.documentNumber, document.documentType === 'NOTA_CREDITO' ? '07' : document.documentType === 'FACTURA' ? '01' : '03', document.series, String(document.number), document.taxAmount.toFixed(2), document.total.toFixed(2), issued.toLocaleDateString('en-CA', { timeZone: 'America/Lima' }), document.receiver.documentType === 'RUC' ? '6' : document.receiver.documentType === 'DNI' ? '1' : '-', document.receiver.documentNumber || '-', document.hash].join('|') : undefined;
   return {
-    title: saleNote ? 'NOTA DE VENTA' : document.documentType === 'FACTURA' ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA ELECTRÓNICA', reference,
+    title: saleNote ? 'NOTA DE VENTA' : document.documentType === 'NOTA_CREDITO' ? 'NOTA DE CRÉDITO ELECTRÓNICA' : document.documentType === 'FACTURA' ? 'FACTURA ELECTRÓNICA' : 'BOLETA DE VENTA ELECTRÓNICA', reference,
     issuerIdentity: saleNote && !document.issuer.documentNumber ? 'Documento interno del sistema' : `RUC ${document.issuer.documentNumber || 'Pendiente'}`,
     issuerAddress: document.issuer.address || (saleNote ? '' : 'Dirección pendiente'),
     label, notice, nonFiscal, qr,

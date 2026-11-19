@@ -61,6 +61,19 @@ const printable = {
   taxType: 'GRAVADO', taxableAmount: .85, exemptAmount: 0, taxAmount: .15, total: 1,
 };
 
+test('credit note PDFs preserve the original document, reason, credited total and fiscal type 07',async()=>{
+  const note={ ...printable,documentType:'NOTA_CREDITO',status:'ACCEPTED',environment:'production',series:'FNC1',number:1,submittedAt:'2026-11-19T17:00:00Z',hash:'offline-hash',originalDocumentId:'000000000000000000000003',originalDocumentType:'FACTURA',originalSeries:'FAG1',originalNumber:25,reasonCode:'07',reasonDescription:'Devolución parcial de producto' };
+  const view=billingPresentation(note);
+  assert.equal(view.title,'NOTA DE CRÉDITO ELECTRÓNICA');assert.equal(view.qr.split('|')[1],'07');
+  for(const format of ['A4','TICKET']) {
+    const definition=buildBillingPrintDefinition(note,format);
+    const text=JSON.stringify(definition.content);
+    assert.ok(text.includes('FAG1-00000025'));assert.ok(text.includes(note.reasonDescription));assert.ok(text.includes('TOTAL A ACREDITAR'));
+    const bytes=await pdfMake.createPdf(definition).getBuffer();assert.equal(Buffer.from(bytes).subarray(0,5).toString(),'%PDF-');
+  }
+  assert.equal(billingPresentation({...note,status:'DRAFT'}).qr,undefined);
+});
+
 test('A4 and 80 mm ticket PDFs preserve the logo, one-sol totals and explicit example labels', async () => {
   for (const format of ['A4', 'TICKET']) {
     const definition = buildBillingPrintDefinition(printable, format, { example: true });

@@ -46,6 +46,7 @@ export function buildBillingPrintDefinition(document: BillingPrintDocument, form
       ] : []),
       ...(ticket ? receiver : [{ columns: [{ width: '*', stack: receiver }, { width: 160, stack: [{ text: `Fecha: ${view.date}` }, { text: `Pago: ${view.payment}`, margin: [0, 5, 0, 0] }, { text: `Afectación: ${view.tax}`, margin: [0, 5, 0, 0] }] }] }]),
       ...(ticket ? [{ text: `Fecha: ${view.date}\nPago: ${view.payment} · ${view.tax}`, margin: [0, 10, 0, 0] }] : []),
+      ...(document.documentType==='NOTA_CREDITO' ? [{ text:`Comprobante afectado: ${document.originalSeries}-${String(document.originalNumber).padStart(8,'0')}\nMotivo ${document.reasonCode}: ${document.reasonDescription}`,margin:[0,10,0,0] }] : []),
       { margin: ticket ? [0, 10, 0, 9] : [0, 15, 0, 12], table: { headerRows: 1, widths: ticket ? ['*', 58] : ['*', 35, 33, 59, 59], body: [
         (ticket ? ['DETALLE', 'IMPORTE'] : ['DESCRIPCIÓN', 'CANT.', 'UND.', 'P. UNIT.', 'IMPORTE']).map((text, index) => ({ text, bold: true, fontSize: ticket ? 9 : 8, color: '#16783d', fillColor: ticket ? '#ffffff' : '#f0fdf4', margin: [0, 5, 0, 5], ...(ticket && index === 1 ? { alignment: 'right' } : {}) })),
         ...document.items.map(item => ticket ? [
@@ -60,7 +61,7 @@ export function buildBillingPrintDefinition(document: BillingPrintDocument, form
       } : 'lightHorizontalLines' },
       { columns: [...(!ticket ? [{ width: '*', text: '' }] : []), { width: ticket ? '*' : 230, table: { widths: ['*', 'auto'], body: [
         ...totalRows.map(([text, value]) => [{ text, color: '#64748b' }, { text: value, alignment: 'right' }]),
-        [{ text: 'TOTAL A PAGAR', bold: true, fontSize: ticket ? 10 : 12, color: '#16783d', margin: [0, 7, 0, 7] }, { text: billingMoney(document.total), bold: true, fontSize: ticket ? 16.5 : 16, alignment: 'right', color: '#16783d', margin: [0, 7, 0, 7] }],
+        [{ text: document.documentType==='NOTA_CREDITO'?'TOTAL A ACREDITAR':'TOTAL A PAGAR', bold: true, fontSize: ticket ? 10 : 12, color: '#16783d', margin: [0, 7, 0, 7] }, { text: billingMoney(document.total), bold: true, fontSize: ticket ? 16.5 : 16, alignment: 'right', color: '#16783d', margin: [0, 7, 0, 7] }],
       ] }, layout: 'noBorders' }] },
       ...(view.qr ? [{ qr: view.qr, fit: ticket ? 90 : 95, alignment: ticket ? 'center' : 'left', margin: [0, 16, 0, 6] }] : []),
       ...(!view.nonFiscal && document.hash ? [{ text: `Hash: ${document.hash}`, fontSize: 6, margin: [0, 8, 0, 0] }] : []),

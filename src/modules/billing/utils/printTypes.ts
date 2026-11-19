@@ -1,4 +1,4 @@
-import type { BillingDocument, BillingDocumentType, BillingTaxType } from '../types';
+import type { BillingCreditNote, BillingDocument, BillingDocumentType, BillingTaxType } from '../types';
 
 // Printing types only. The fiscal API continues to accept FACTURA and BOLETA.
 export type BillingPrintDocumentType = BillingDocumentType | 'NOTA_VENTA';
@@ -7,4 +7,4 @@ export type SaleNotePrintDocument = Omit<BillingDocument, 'documentType' | 'taxT
   taxType: BillingTaxType | 'MIXTO';
   internalReference: string;
 };
-export type BillingPrintDocument = BillingDocument | SaleNotePrintDocument;
+export type BillingPrintDocument = BillingDocument | SaleNotePrintDocument | BillingCreditNote;
