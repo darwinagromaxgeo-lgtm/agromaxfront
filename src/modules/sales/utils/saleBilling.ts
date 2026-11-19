@@ -11,6 +11,7 @@ export const saleBillingStates: Record<BillingStatus, { label: string; color: st
   DISCARDED: { label: 'Descartado', color: 'bg-gray-100 text-gray-500' },
 };
 export const billingReference = (document: BillingDocument) => document.series && document.number ? `${document.series}-${String(document.number).padStart(8, '0')}` : 'Sin numeración';
+export const fiscalDocumentState = (document:BillingDocument) => document.cancelledByCreditNoteId ? {label:'Anulado por nota de crédito',color:'bg-gray-100 text-gray-600'} : saleBillingStates[document.status];
 export const saleFiscalDocuments = (documents: BillingDocument[], saleId: string) => documents.filter(document => document.saleId === saleId && document.status !== 'DISCARDED');
 export const billingBlocksCancellation = (documents: BillingDocument[]) => documents.some(document => ['SENDING', 'PENDING', 'ACCEPTED', 'UNKNOWN'].includes(document.status));
 
@@ -21,11 +22,11 @@ export function voucherExportRows(sales: Sale[], documents: BillingDocument[], c
     const companyIds = [...new Set(sale.items.map(item => item.companyId))];
     const common = { 'Fecha venta': new Date(sale.date).toLocaleDateString('es-PE', { timeZone: 'America/Lima' }), 'Referencia venta': sale.id, 'Método de Pago': sale.isCredit ? 'Crédito' : sale.payments?.map(payment => payment.paymentMethodName).join(' + ') || 'Efectivo' };
     if (associated.length) return associated.map(document => ({
-      ...common, 'Tipo': document.documentType, 'Serie': document.series || '', 'Correlativo': document.number || '', 'Estado SUNAT': saleBillingStates[document.status].label,
+      ...common, 'Tipo': document.documentType, 'Serie': document.series || '', 'Correlativo': document.number || '', 'Estado SUNAT': fiscalDocumentState(document).label,
       'Cliente': document.receiver.name, 'Documento cliente': document.receiver.documentNumber || '', 'Empresa': document.issuer.name,
       'Productos': document.items.map(item => `${item.description} x${item.quantity}`).join(', '), 'Afectación': document.taxType,
-      'Valor Venta': Math.round((document.taxableAmount + document.exemptAmount + document.unaffectedAmount) * 100) / 100,
-      'IGV': document.taxAmount, 'Total': document.total, 'Respuesta SUNAT': document.sunatDescription || '',
+      'Valor Venta': document.cancelledByCreditNoteId ? 0 : Math.round((document.taxableAmount + document.exemptAmount + document.unaffectedAmount) * 100) / 100,
+      'IGV': document.cancelledByCreditNoteId ? 0 : document.taxAmount, 'Total': document.cancelledByCreditNoteId ? 0 : document.total, 'Importe anulado':document.cancelledByCreditNoteId ? document.total : 0, 'Respuesta SUNAT': document.sunatDescription || '',
     }));
     const base = sale.items.reduce((sum, item) => {
       const taxType = item.taxType || context.products.get(item.productId)?.taxType || 'GRAVADO';

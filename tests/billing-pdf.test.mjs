@@ -74,6 +74,12 @@ test('credit note PDFs preserve the original document, reason, credited total an
   assert.equal(billingPresentation({...note,status:'DRAFT'}).qr,undefined);
 });
 
+test('cancelled originals are clearly marked as historical and do not print an active fiscal QR',()=>{
+  const cancelled={...printable,status:'ACCEPTED',environment:'production',series:'FAG1',number:1,hash:'old-hash',submittedAt:'2026-11-19T18:00:00Z',cancelledByCreditNoteId:'cancellation'};
+  const view=billingPresentation(cancelled);assert.equal(view.label,'ANULADO POR NOTA DE CRÉDITO');assert.equal(view.qr,undefined);assert.match(view.notice,/antecedente del pedido/);
+  assert.ok(JSON.stringify(buildBillingPrintDefinition(cancelled,'A4').content).includes('ANULADO POR NOTA DE CRÉDITO'));
+});
+
 test('A4 and 80 mm ticket PDFs preserve the logo, one-sol totals and explicit example labels', async () => {
   for (const format of ['A4', 'TICKET']) {
     const definition = buildBillingPrintDefinition(printable, format, { example: true });

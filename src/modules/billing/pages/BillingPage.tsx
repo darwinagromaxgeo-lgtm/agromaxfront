@@ -15,6 +15,7 @@ import { downloadBillingDraft } from '../utils/draftPdf';
 import { BillingPreviewModal } from '../components/BillingPreviewModal';
 import { BillingRecipientForm } from '../components/BillingRecipientForm';
 import { CreditNotesPanel } from '../components/CreditNotesPanel';
+import { BillingReissueModal } from '../components/BillingReissueModal';
 import { recipientDocumentType, recipientFormError, recipientFormFromParty, recipientParty, type RecipientFormState } from '../utils/recipientForm';
 import { billingFormatExample } from '../utils/exampleDocument';
 import type { BillingPrintDocumentType } from '../utils/printTypes';
@@ -29,6 +30,7 @@ const states: Record<BillingStatus, { label: string; color: string }> = {
   UNKNOWN: { label: 'Requiere revisión', color: 'bg-orange-100 text-orange-800' },
   DISCARDED: { label: 'Descartado', color: 'bg-gray-100 text-gray-500' },
 };
+const documentState=(document:BillingDocument)=>document.cancelledByCreditNoteId ? {label:'Anulado por nota de crédito',color:'bg-gray-100 text-gray-600'} : states[document.status];
 const taxes = { GRAVADO: 'Gravado', EXONERADO: 'Exonerado', INAFECTO: 'Inafecto' };
 const money = (value: number) => `S/ ${value.toFixed(2)}`;
 const date = (value?: string) => value ? new Date(value).toLocaleDateString('es-PE', { timeZone: 'America/Lima' }) : '—';
@@ -62,7 +64,7 @@ function DocumentSummary({ document }: { document: BillingDocument }) {
   return <div className="space-y-4">
     <div className="flex flex-wrap gap-2 items-center">
       <span className="font-semibold">{document.documentType === 'FACTURA' ? 'Factura' : 'Boleta'} · {taxes[document.taxType]}</span>
-      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${states[document.status].color}`}>{states[document.status].label}</span>
+      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${documentState(document).color}`}>{documentState(document).label}</span>
       {document.series && <span className="font-mono text-sm">{document.series}-{String(document.number).padStart(8, '0')}</span>}
     </div>
     <div className="grid sm:grid-cols-2 gap-4 rounded-xl bg-gray-50 p-4 text-sm">
@@ -85,6 +87,7 @@ function DocumentSummary({ document }: { document: BillingDocument }) {
     {document.sunatDescription && <div className="rounded-lg bg-gray-50 p-3 text-sm"><strong>Respuesta del servicio{document.sunatCode ? ` · ${document.sunatCode}` : ''}</strong><p className="mt-1 whitespace-pre-wrap">{document.sunatDescription}</p>{document.ticket && <p className="mt-2 text-xs break-all">Ticket: {document.ticket}</p>}</div>}
     {document.status === 'UNKNOWN' && <p className="rounded-lg bg-orange-50 text-orange-900 p-3 text-sm">El resultado requiere revisión. No se habilita un nuevo envío para evitar duplicar un comprobante que pudo haber sido recibido.</p>}
     {document.discardReason && <p className="text-sm text-gray-500">Motivo de descarte: {document.discardReason}</p>}
+    {document.cancelledByCreditNoteId && <p className="rounded-lg bg-gray-100 p-3 text-sm">Comprobante anulado mediante nota de crédito aceptada. El pedido y sus pagos se conservan. {document.cancellationReason}</p>}
   </div>;
 }
 
@@ -100,6 +103,7 @@ export function BillingPage() {
   const [page, setPage] = useState(1);
   const [notesView,setNotesView]=useState(false);
   const [creditOriginalId,setCreditOriginalId]=useState('');
+  const [reissueId,setReissueId]=useState('');
   const [startDate, setStartDate] = useState(() => `${today().slice(0, 7)}-01`);
   const [endDate, setEndDate] = useState(today);
   const [companyId, setCompanyId] = useState('');
@@ -127,6 +131,7 @@ export function BillingPage() {
 
   useEffect(() => {
     setNotesView(false);setCreditOriginalId('');
+    setReissueId('');
     setPage(1); setCreateOpen(false); setDetailId(null); setSaleId(''); setGroupKey(''); setIssueOpen(false); setDiscardOpen(false); setFormatPreview(null); setExampleOpen(false);
   }, [branchId]);
   useEffect(() => { setPage(1); }, [startDate, endDate, companyId, type, status]);
@@ -187,9 +192,10 @@ export function BillingPage() {
     try { await downloadBillingDraft(draft, simulated); } catch { toast.error('No se pudo generar el PDF'); } finally { setDownloading(false); }
   };
   if (!allowed) return <div className="rounded-xl bg-white border p-6 text-gray-600">Selecciona una sucursal con acceso de administrador o vendedor para abrir Facturación.</div>;
-  if (notesView) return <div className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-bold text-gray-800">Facturación</h1><div className="flex gap-2"><button className={buttonClass} onClick={()=>setNotesView(false)}>Ver comprobantes</button><button className={buttonClass} onClick={()=>connection.refetch()} disabled={connection.isFetching}><RefreshCw size={14} /> Verificar conexión</button></div></div><CreditNotesPanel key={branchId} branchId={branchId!} connection={connection.data} initialOriginalId={creditOriginalId} onOriginalConsumed={()=>setCreditOriginalId('')} /></div>;
+  if (notesView) return <div className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-bold text-gray-800">Facturación</h1><div className="flex gap-2"><button className={buttonClass} onClick={()=>setNotesView(false)}>Ver comprobantes</button><button className={buttonClass} onClick={()=>connection.refetch()} disabled={connection.isFetching}><RefreshCw size={14} /> Verificar conexión</button></div></div><CreditNotesPanel key={branchId} branchId={branchId!} connection={connection.data} initialOriginalId={creditOriginalId} onOriginalConsumed={()=>setCreditOriginalId('')} onReissue={id=>{setNotesView(false);setReissueId(id);}} /></div>;
 
   return <div className="space-y-5">
+    {reissueId && <BillingReissueModal key={`${branchId}:${reissueId}`} originalId={reissueId} branchId={branchId!} onClose={()=>setReissueId('')} onSaved={result=>{if(result.branchId!==branchRef.current)return;setReissueId('');refresh(result);}} />}
     <div><button className={buttonClass} onClick={()=>setNotesView(true)}><Undo2 size={16} /> Notas de crédito</button></div>
     <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><FileCheck2 size={25} /> Facturación</h1><p className="text-sm text-gray-500 mt-1">Comprobantes de venta separados por empresa y afectación tributaria.</p></div><div className="flex flex-wrap gap-2"><button className={buttonClass} onClick={() => { setFormatPreview(null); setExampleOpen(true); }}><Eye size={17} /> Ver formatos</button><button className={primaryClass} onClick={() => { setSaleId(''); setGroupKey(''); setSalePage(1); setRecipient(recipientFormFromParty()); setRecipientTouched(false); setCreateOpen(true); }}><Plus size={17} /> Preparar comprobante</button></div></div>
     <div className={`rounded-xl border p-4 ${connection.data?.ready ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
@@ -203,7 +209,7 @@ export function BillingPage() {
       <label className="text-xs text-gray-500">Estado<select className={`${inputClass} mt-1`} value={status} onChange={event => setStatus(event.target.value as BillingStatus | '')}><option value="">Todos</option>{Object.entries(states).map(([value, meta]) => <option key={value} value={value}>{meta.label}</option>)}</select></label>
     </div>
     <div className="rounded-xl bg-white border border-gray-200 overflow-hidden">
-      {documents.isLoading ? <p className="p-8 text-center text-gray-500">Cargando comprobantes…</p> : documents.error ? <div className="p-6 text-red-700"><p>{apiError(documents.error)}</p><button className={`${buttonClass} mt-3`} onClick={() => documents.refetch()}>Volver a intentar</button></div> : !documents.data?.data.length ? <div className="p-10 text-center text-gray-500"><FileText size={32} className="mx-auto mb-3 text-gray-300" /><p>No hay comprobantes con estos filtros.</p><p className="text-xs mt-1">Prepara un borrador a partir de una venta registrada.</p></div> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-xs text-gray-500"><tr><th className="p-3 text-left">Fecha</th><th className="p-3 text-left">Comprobante</th><th className="p-3 text-left">Emisor / Cliente</th><th className="p-3 text-left">Afectación</th><th className="p-3 text-left">Estado</th><th className="p-3 text-right">Total</th><th className="p-3" /></tr></thead><tbody>{documents.data.data.map(item => <tr key={item.id} className="border-t border-gray-100"><td className="p-3 whitespace-nowrap">{date(item.createdAt)}</td><td className="p-3"><p className="font-semibold">{item.documentType === 'FACTURA' ? 'Factura' : 'Boleta'}</p><p className="text-xs text-gray-500 font-mono">{item.series ? `${item.series}-${String(item.number).padStart(8, '0')}` : `Borrador ${item.id.slice(-8)}`}</p></td><td className="p-3 min-w-44"><p className="font-medium">{item.issuer.name}</p><p className="text-xs text-gray-500">{item.receiver.name}</p></td><td className="p-3">{taxes[item.taxType]}</td><td className="p-3"><span className={`rounded-full px-2 py-1 text-xs whitespace-nowrap ${states[item.status].color}`}>{states[item.status].label}</span></td><td className="p-3 text-right font-semibold whitespace-nowrap">{money(item.total)}</td><td className="p-3"><button className={buttonClass} onClick={() => setDetailId(item.id)} aria-label="Ver comprobante"><Eye size={16} /></button></td></tr>)}</tbody></table></div>}
+      {documents.isLoading ? <p className="p-8 text-center text-gray-500">Cargando comprobantes…</p> : documents.error ? <div className="p-6 text-red-700"><p>{apiError(documents.error)}</p><button className={`${buttonClass} mt-3`} onClick={() => documents.refetch()}>Volver a intentar</button></div> : !documents.data?.data.length ? <div className="p-10 text-center text-gray-500"><FileText size={32} className="mx-auto mb-3 text-gray-300" /><p>No hay comprobantes con estos filtros.</p><p className="text-xs mt-1">Prepara un borrador a partir de una venta registrada.</p></div> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-gray-50 text-xs text-gray-500"><tr><th className="p-3 text-left">Fecha</th><th className="p-3 text-left">Comprobante</th><th className="p-3 text-left">Emisor / Cliente</th><th className="p-3 text-left">Afectación</th><th className="p-3 text-left">Estado</th><th className="p-3 text-right">Total</th><th className="p-3" /></tr></thead><tbody>{documents.data.data.map(item => <tr key={item.id} className="border-t border-gray-100"><td className="p-3 whitespace-nowrap">{date(item.createdAt)}</td><td className="p-3"><p className="font-semibold">{item.documentType === 'FACTURA' ? 'Factura' : 'Boleta'}</p><p className="text-xs text-gray-500 font-mono">{item.series ? `${item.series}-${String(item.number).padStart(8, '0')}` : `Borrador ${item.id.slice(-8)}`}</p></td><td className="p-3 min-w-44"><p className="font-medium">{item.issuer.name}</p><p className="text-xs text-gray-500">{item.receiver.name}</p></td><td className="p-3">{taxes[item.taxType]}</td><td className="p-3"><span className={`rounded-full px-2 py-1 text-xs whitespace-nowrap ${documentState(item).color}`}>{documentState(item).label}</span></td><td className="p-3 text-right font-semibold whitespace-nowrap">{money(item.total)}</td><td className="p-3"><button className={buttonClass} onClick={() => setDetailId(item.id)} aria-label="Ver comprobante"><Eye size={16} /></button></td></tr>)}</tbody></table></div>}
     </div>
     <Pagination page={page} totalPages={Math.ceil((documents.data?.total || 0) / 15)} onPageChange={setPage} />
 
@@ -227,7 +233,10 @@ export function BillingPage() {
       {detail.isLoading ? <p>Cargando…</p> : detail.error ? <p className="text-red-700">{apiError(detail.error)}</p> : document && <div className="space-y-5"><button className={buttonClass} onClick={() => setFormatPreview({ document })}><Eye size={16} /> Vista A4 y ticket</button><DocumentSummary document={document} /><IdentityCheck key={`${branchId}:${document.id}`} document={document} />
       {simulationResult && document.status === 'DRAFT' && <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3"><p className="font-bold text-blue-900">SIMULACIÓN · SIN VALIDEZ TRIBUTARIA</p><button className={buttonClass} onClick={() => setFormatPreview({ document: simulationResult.document, simulation: true })}><Eye size={16} /> Ver simulación en A4 y ticket</button><p className="text-sm">{simulationResult.message}</p>{simulationResult.service && <p className="text-sm font-medium">{simulationResult.service.message}</p>}<ul className="space-y-2 text-sm">{simulationResult.checks.map(check => <li key={check.label}><span className="font-semibold">{check.passed ? '✓' : 'Pendiente:'} {check.label}.</span> {check.detail}</li>)}</ul><button className={buttonClass} disabled={downloading} onClick={() => simulationResult.service?.verified ? billingService.downloadSimulation(simulationResult, 'pdf') : downloadDraft(simulationResult.document, true)}><Download size={15} /> Descargar PDF de simulación</button>{simulationResult.service?.verified && <button className={`${buttonClass} ml-2`} onClick={() => billingService.downloadSimulation(simulationResult, 'xml')}><Download size={15} /> XML de simulación</button>}</div>}
       <div className="flex flex-wrap gap-2">
-        {document.status==='ACCEPTED' && <button className={buttonClass} onClick={()=>{setCreditOriginalId(document.id);setDetailId(null);setNotesView(true);}}><Undo2 size={15} /> Crear nota de crédito por devolución</button>}
+        {document.status==='ACCEPTED' && !document.cancelledByCreditNoteId && <button className={buttonClass} onClick={()=>{setCreditOriginalId(document.id);setDetailId(null);setNotesView(true);}}><Undo2 size={15} /> Anular comprobante con nota de crédito</button>}
+        {document.cancelledByCreditNoteId && <button className={primaryClass} onClick={()=>{setReissueId(document.id);setDetailId(null);}}>Volver a emitir pedido</button>}
+        {document.replacementDocumentId && <button className={buttonClass} onClick={()=>setDetailId(document.replacementDocumentId!)}>Ver comprobante nuevo</button>}
+        {document.replacesDocumentId && <button className={buttonClass} onClick={()=>setDetailId(document.replacesDocumentId!)}>Ver comprobante anterior</button>}
         {document.status === 'DRAFT' && <button className={primaryClass} disabled={simulation.isPending} onClick={() => simulation.mutate(document.id)}><FlaskConical size={15} /> {simulation.isPending ? 'Simulando…' : 'Simular sin enviar'}</button>}
         {document.status === 'DRAFT' && <><button className={buttonClass} disabled={downloading} onClick={() => downloadDraft(document)}><Download size={15} /> PDF de borrador</button><button className={`${buttonClass} text-red-600`} onClick={() => { setDiscardReason(''); setDiscardOpen(true); }}><Trash2 size={15} /> Descartar borrador</button><button className={primaryClass} disabled={issue.isPending || saveReceiver.isPending} onClick={() => { setIssueRecipient(recipientFormFromParty(document.receiver, document.documentType)); setIssueStep('receiver'); setIssueConfirmed(false); setIssueOpen(true); }}><Send size={15} /> Preparar envío</button></>}
         {document.status === 'PENDING' && <button className={primaryClass} disabled={check.isPending} onClick={() => check.mutate(document.id)}><RefreshCw size={15} /> {check.isPending ? 'Consultando…' : 'Consultar estado SUNAT'}</button>}

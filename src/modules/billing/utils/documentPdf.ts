@@ -61,7 +61,7 @@ export function buildBillingPrintDefinition(document: BillingPrintDocument, form
       } : 'lightHorizontalLines' },
       { columns: [...(!ticket ? [{ width: '*', text: '' }] : []), { width: ticket ? '*' : 230, table: { widths: ['*', 'auto'], body: [
         ...totalRows.map(([text, value]) => [{ text, color: '#64748b' }, { text: value, alignment: 'right' }]),
-        [{ text: document.documentType==='NOTA_CREDITO'?'TOTAL A ACREDITAR':'TOTAL A PAGAR', bold: true, fontSize: ticket ? 10 : 12, color: '#16783d', margin: [0, 7, 0, 7] }, { text: billingMoney(document.total), bold: true, fontSize: ticket ? 16.5 : 16, alignment: 'right', color: '#16783d', margin: [0, 7, 0, 7] }],
+        [{ text: document.cancelledByCreditNoteId?'IMPORTE ANULADO':document.documentType==='NOTA_CREDITO'?'TOTAL A ACREDITAR':'TOTAL A PAGAR', bold: true, fontSize: ticket ? 10 : 12, color: '#16783d', margin: [0, 7, 0, 7] }, { text: billingMoney(document.total), bold: true, fontSize: ticket ? 16.5 : 16, alignment: 'right', color: '#16783d', margin: [0, 7, 0, 7] }],
       ] }, layout: 'noBorders' }] },
       ...(view.qr ? [{ qr: view.qr, fit: ticket ? 90 : 95, alignment: ticket ? 'center' : 'left', margin: [0, 16, 0, 6] }] : []),
       ...(!view.nonFiscal && document.hash ? [{ text: `Hash: ${document.hash}`, fontSize: 6, margin: [0, 8, 0, 0] }] : []),

@@ -31,7 +31,7 @@ export function BillingDocumentPaper({ document, format, options = {} }: {
       {(!ticket || document.exemptAmount > 0) && <p><span>Op. exoneradas</span><b>{billingMoney(document.exemptAmount)}</b></p>}
       {(!ticket || document.unaffectedAmount > 0) && <p><span>Op. inafectas</span><b>{billingMoney(document.unaffectedAmount)}</b></p>}
       <p><span>IGV</span><b>{billingMoney(document.taxAmount)}</b></p>
-      <p className="billing-sheet-grand-total"><span>{document.documentType === 'NOTA_CREDITO' ? 'TOTAL A ACREDITAR' : 'TOTAL A PAGAR'}</span><b>{billingMoney(document.total)}</b></p>
+      <p className="billing-sheet-grand-total"><span>{document.cancelledByCreditNoteId ? 'IMPORTE ANULADO' : document.documentType === 'NOTA_CREDITO' ? 'TOTAL A ACREDITAR' : 'TOTAL A PAGAR'}</span><b>{billingMoney(document.total)}</b></p>
     </section>
     <footer className="billing-sheet-footer"><p className={view.nonFiscal ? 'billing-sheet-notice' : ''}>{view.notice}</p>{!view.nonFiscal && document.hash && <p className="billing-sheet-hash">Hash: {document.hash}</p>}<p className="billing-sheet-thanks">Gracias por tu compra</p><p>Agromax · Innovando la agricultura</p></footer>
   </article>;

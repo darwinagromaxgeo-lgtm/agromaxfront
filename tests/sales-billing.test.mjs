@@ -31,6 +31,15 @@ test('unissued or uncertain sales never acquire an accepted status or invented f
   assert.equal(draft['Estado SUNAT'], 'Borrador · sin emitir'); assert.equal(draft.Correlativo, '');
 });
 
+test('cancelled receipts remain in history and do not double the replacement amount in exports',()=>{
+  const cancelled={...document,cancelledByCreditNoteId:'credit-note',cancelledAt:'2026-11-19T18:00:00Z'};
+  const replacement={...document,id:'replacement',number:3,replacesDocumentId:document.id};
+  const rows=voucherExportRows([sale],[cancelled,replacement],context);
+  assert.equal(rows.length,2);assert.equal(rows[0]['Estado SUNAT'],'Anulado por nota de crédito');assert.equal(rows[0].Total,0);assert.equal(rows[0]['Importe anulado'],document.total);
+  assert.equal(rows[1].Total,document.total);assert.equal(rows.reduce((sum,row)=>sum+row.Total,0),document.total);
+  assert.equal(billingBlocksCancellation([cancelled]),true,'Fiscal cancellation must not enable operational cancellation that restores stock or money');
+});
+
 test('fiscal associations stay scoped to their sale and block operational cancellation only for submitted states', () => {
   const documents = [document, { ...document, id: 'foreign', saleId: 'other' }, { ...document, id: 'discarded', status: 'DISCARDED' }];
   assert.deepEqual(saleFiscalDocuments(documents, 'sale').map(item => item.id), ['cpe']);

@@ -14,9 +14,9 @@ export function billingPresentation(document: BillingPrintDocument, options: Bil
   const statuses = { DRAFT: 'BORRADOR', SENDING: 'ENVIANDO', PENDING: 'PENDIENTE DE SUNAT', ACCEPTED: 'ACEPTADO', REJECTED: 'RECHAZADO', UNKNOWN: 'REQUIERE REVISIÓN', DISCARDED: 'DESCARTADO' };
   const example = options.example === true;
   const simulation = options.simulation === true;
-  const nonFiscal = saleNote || example || simulation || document.status === 'DRAFT' || document.status === 'DISCARDED' || document.environment === 'beta';
-  const label = example ? 'EJEMPLO DE FORMATO' : simulation ? 'SIMULACIÓN' : saleNote ? (document.status === 'DISCARDED' ? 'ANULADA · DOCUMENTO INTERNO' : 'DOCUMENTO INTERNO') : document.environment === 'beta' ? `PRUEBAS · ${statuses[document.status]}` : statuses[document.status];
-  const notice = example ? 'Datos de ejemplo. Sin validez tributaria.'
+  const nonFiscal = !!document.cancelledByCreditNoteId || saleNote || example || simulation || document.status === 'DRAFT' || document.status === 'DISCARDED' || document.environment === 'beta';
+  const label = document.cancelledByCreditNoteId ? 'ANULADO POR NOTA DE CRÉDITO' : example ? 'EJEMPLO DE FORMATO' : simulation ? 'SIMULACIÓN' : saleNote ? (document.status === 'DISCARDED' ? 'ANULADA · DOCUMENTO INTERNO' : 'DOCUMENTO INTERNO') : document.environment === 'beta' ? `PRUEBAS · ${statuses[document.status]}` : statuses[document.status];
+  const notice = document.cancelledByCreditNoteId ? 'Comprobante anulado mediante nota de crédito. Conservado como antecedente del pedido.' : example ? 'Datos de ejemplo. Sin validez tributaria.'
     : simulation ? 'Simulación local. No enviada a SUNAT. Sin validez tributaria.'
       : saleNote ? 'Nota de venta interna. Sin validez tributaria.'
       : document.status === 'DRAFT' || document.status === 'DISCARDED' ? 'Documento interno sin validez tributaria. No emitido a SUNAT.'
