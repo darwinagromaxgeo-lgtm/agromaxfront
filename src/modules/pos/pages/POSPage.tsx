@@ -86,7 +86,8 @@ function resolvePrice(product: Product, tierId: string, companyId: string, branc
 const BROWSE_LIMIT = 24;
 
 export function POSPage() {
-  const { selectedBranch } = useAuth();
+  const { selectedBranch, user } = useAuth();
+  const canChangePrice = user?.role === 'ADMIN';
   const queryClient = useQueryClient();
   // Estados de búsqueda/paginación (antes del query para usarlos como params)
   const [categoryId, setCategoryId] = useState<string>('');
@@ -548,6 +549,7 @@ export function POSPage() {
   };
 
   const setItemCustomPrice = (productId: string, price: number) => {
+    if (!canChangePrice) return;
     setCart((prev) =>
       prev.map((i) =>
         i.productId === productId
@@ -1240,7 +1242,7 @@ export function POSPage() {
                             ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
                             : 'text-gray-400 hover:text-primary-600 hover:bg-gray-100'
                         }`}
-                        title="Cambiar precio / rango"
+                        title={canChangePrice ? 'Cambiar precio / rango' : 'Seleccionar rango configurado'}
                       >
                         <Pencil size={9} /> {effectiveTierName}
                       </button>
@@ -1292,6 +1294,7 @@ export function POSPage() {
                           );
                         })}
                       </div>
+                      {canChangePrice && <>
                       <div className="text-[11px] text-gray-500 font-medium pt-1">Precio personalizado</div>
                       <div className="flex gap-1.5">
                         <div className="relative flex-1">
@@ -1328,6 +1331,7 @@ export function POSPage() {
                           Aplicar
                         </button>
                       </div>
+                      </>}
                     </div>
                   )}
                 </div>

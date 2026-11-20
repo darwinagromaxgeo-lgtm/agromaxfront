@@ -44,7 +44,8 @@ interface BulkProduct {
 }
 
 export function ProductsPage() {
-  const { selectedBranch } = useAuth();
+  const { selectedBranch, user } = useAuth();
+  const canManageProducts = user?.role === 'ADMIN';
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get('page') || '1');
   const activeTab = (searchParams.get('tab') || 'active') as 'active' | 'inactive';
@@ -651,11 +652,11 @@ export function ProductsPage() {
       <div className="flex gap-2">
         {activeTab === 'active' && <button onClick={() => setSuppliersTarget(item)} className="text-gray-500 hover:text-primary-600" title="Ver proveedores"><Truck size={16} /></button>}
         {activeTab === 'active' && item.tracksLot && <button onClick={() => setLotsTarget(item)} className="text-purple-600 hover:text-purple-800" title="Ver lotes"><Package size={16} /></button>}
-        {activeTab === 'active' && <button onClick={() => openEdit(item)} className="text-blue-600 hover:text-blue-800" title="Editar"><Edit2 size={16} /></button>}
-        {activeTab === 'active'
+        {canManageProducts && activeTab === 'active' && <button onClick={() => openEdit(item)} className="text-blue-600 hover:text-blue-800" title="Editar"><Edit2 size={16} /></button>}
+        {canManageProducts && (activeTab === 'active'
           ? <button onClick={() => setDeleteTarget(item)} className="text-red-600 hover:text-red-800" title="Desactivar"><Trash2 size={16} /></button>
           : <button onClick={() => updateProduct.mutateAsync({ id: item.id, data: { isActive: true } })} className="text-green-600 hover:text-green-800 text-xs font-medium px-2 py-1 border border-green-300 rounded-lg" title="Reactivar">Reactivar</button>
-        }
+        )}
       </div>
     )},
   ];
@@ -677,15 +678,15 @@ export function ProductsPage() {
               <button onClick={() => setParams({ tab: 'inactive', page: '' })} className={`px-3 py-1 font-medium transition-colors ${activeTab === 'inactive' ? 'bg-red-500 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>Desactivados</button>
             </div>
           </div>
-          <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
+          {canManageProducts && <button onClick={openCreate} className="flex items-center gap-2 px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium">
             <Plus size={16} /> <span className="hidden sm:inline">Nuevo Producto</span><span className="sm:hidden">Nuevo</span>
-          </button>
+          </button>}
         </div>
         {/* Secondary actions — scrollable on mobile */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 scrollbar-hide">
           <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm whitespace-nowrap flex-shrink-0"><Download size={15} /> Exportar</button>
-          <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm whitespace-nowrap flex-shrink-0"><Upload size={15} /> Importar</button>
-          <button onClick={openBulk} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm whitespace-nowrap flex-shrink-0"><Layers size={15} /> Carga Masiva</button>
+          {canManageProducts && <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm whitespace-nowrap flex-shrink-0"><Upload size={15} /> Importar</button>}
+          {canManageProducts && <button onClick={openBulk} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm whitespace-nowrap flex-shrink-0"><Layers size={15} /> Carga Masiva</button>}
           <input ref={fileInputRef} type="file" accept=".xlsx,.xls" onChange={handleImport} className="hidden" />
         </div>
       </div>
@@ -841,7 +842,7 @@ export function ProductsPage() {
               )}
 
               {/* Actions */}
-              {activeTab === 'active' ? (
+              {canManageProducts && (activeTab === 'active' ? (
                 <div className={`grid ${item.tracksLot ? 'grid-cols-4' : 'grid-cols-3'} gap-2`}>
                   <button onClick={() => setSuppliersTarget(item)} className="flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
                     <Truck size={13} /> Prov.
@@ -862,7 +863,7 @@ export function ProductsPage() {
                 <button onClick={() => updateProduct.mutateAsync({ id: item.id, data: { isActive: true } })} className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200">
                   Reactivar producto
                 </button>
-              )}
+              ))}
             </div>
           );
         })}
@@ -874,7 +875,7 @@ export function ProductsPage() {
       </div>
 
       <Pagination page={page} totalPages={Math.ceil(total / 20)} onPageChange={(p) => setParams({ page: p > 1 ? String(p) : '' })} />
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editing ? 'Editar Producto' : 'Nuevo Producto'} size="lg">
+      <Modal isOpen={canManageProducts && showModal} onClose={() => setShowModal(false)} title={editing ? 'Editar Producto' : 'Nuevo Producto'} size="lg">
         <form onSubmit={handleSubmit} className="space-y-4">
           {editing && <ProductCatalogReview product={editing} />}
           {editing && (
@@ -1267,7 +1268,7 @@ export function ProductsPage() {
         </div>
       </Modal>
 
-      <Modal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} title={`Carga Masiva de Productos (${bulkProducts.length})`} size="xl">
+      <Modal isOpen={canManageProducts && showBulkModal} onClose={() => setShowBulkModal(false)} title={`Carga Masiva de Productos (${bulkProducts.length})`} size="xl">
         <div className="space-y-3">
           {bulkProducts.map((bp, idx) => (
             <div key={idx} className="border rounded-lg overflow-hidden">
@@ -1334,7 +1335,7 @@ export function ProductsPage() {
       </Modal>
 
       {/* Modal de previsualización de importación Excel del cliente */}
-      <Modal isOpen={showImportModal} onClose={() => { setShowImportModal(false); setImportPreview(null); }} title="Confirmar Importación de Productos" size="lg">
+      <Modal isOpen={canManageProducts && showImportModal} onClose={() => { setShowImportModal(false); setImportPreview(null); }} title="Confirmar Importación de Productos" size="lg">
         {importPreview && (
           <div className="space-y-4">
             {/* Resumen */}

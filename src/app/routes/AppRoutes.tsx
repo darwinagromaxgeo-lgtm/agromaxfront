@@ -63,7 +63,7 @@ export function AppRoutes() {
         <Route path="categories" element={<Suspense fallback={<Loading />}><CategoriesPage /></Suspense>} />
         <Route path="units" element={<Suspense fallback={<Loading />}><UnitsPage /></Suspense>} />
         <Route path="companies" element={<Suspense fallback={<Loading />}><CompaniesPage /></Suspense>} />
-        <Route path="price-tiers" element={<Suspense fallback={<Loading />}><PriceTiersPage /></Suspense>} />
+        <Route path="price-tiers" element={<ProtectedRoute roles={['ADMIN']}><Suspense fallback={<Loading />}><PriceTiersPage /></Suspense></ProtectedRoute>} />
         <Route path="admin" element={<ProtectedRoute roles={['ADMIN']}><Suspense fallback={<Loading />}><AdminPage /></Suspense></ProtectedRoute>} />
         <Route path="users" element={<ProtectedRoute roles={['ADMIN']}><Suspense fallback={<Loading />}><UsersPage /></Suspense></ProtectedRoute>} />
         <Route path="branches" element={<ProtectedRoute roles={['ADMIN']}><Suspense fallback={<Loading />}><BranchesPage /></Suspense></ProtectedRoute>} />

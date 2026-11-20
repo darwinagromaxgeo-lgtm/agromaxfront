@@ -58,7 +58,7 @@ const navSections: NavSection[] = [
       { path: '/categories', label: 'Categorías', icon: FolderTree },
       { path: '/units', label: 'Unidades de Medida', icon: Ruler },
       { path: '/companies', label: 'Empresas', icon: Building2 },
-      { path: '/price-tiers', label: 'Rangos de Precio', icon: Layers },
+      { path: '/price-tiers', label: 'Rangos de Precio', icon: Layers, roles: ['ADMIN'] },
     ],
   },
   {
