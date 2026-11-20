@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff } from 'lucide-react';
 import { BrandLogo } from '../../../shared/components/BrandLogo';
+import { roleHome } from '../../../shared/utils/accessPolicy';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -17,8 +18,8 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(username, password);
-      navigate('/dashboard');
+      const user = await login(username, password);
+      navigate(roleHome(user.role), { replace: true });
       toast.success('Bienvenido');
     } catch (err: any) {
       const msg = err.response?.data?.message;

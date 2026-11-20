@@ -12,6 +12,7 @@ import {
 import type { AccountPayable } from '../types';
 import { BranchSelector } from './BranchSelector';
 import { BrandLogo } from './BrandLogo';
+import { canAccessView, roleHome } from '../utils/accessPolicy';
 
 type NavItem = { path: string; label: string; icon: any; roles?: string[] };
 type NavSection = { label: string; items: NavItem[] };
@@ -72,6 +73,14 @@ const navSections: NavSection[] = [
 
 export function Layout() {
   const { user, logout, branches, selectedBranch, selectBranch } = useAuth();
+  const isSeller = user?.role === 'VENDEDOR';
+  const home = roleHome(user?.role);
+  const bottomNav = isSeller ? [
+    { path: '/quotes', label: 'Cotizaciones', icon: ScrollText },
+    { path: '/sales', label: 'Ventas', icon: ShoppingCart },
+    { path: '/pos', label: 'POS', icon: ScanLine },
+    { path: '/clients', label: 'Clientes', icon: Users },
+  ] : BOTTOM_NAV;
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -79,8 +88,8 @@ export function Layout() {
   const [moreOpen, setMoreOpen] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
 
-  const { data: apAlerts } = useAPAlerts(3);
-  const { data: priceFloorData } = usePriceFloorAlerts();
+  const { data: apAlerts } = useAPAlerts(3, !isSeller);
+  const { data: priceFloorData } = usePriceFloorAlerts(!isSeller);
 
   type PriceFloorItem = { id: string; name: string; minSalePrice: number; lowestPrice: number };
   const priceFloorItems: PriceFloorItem[] = priceFloorData?.products ?? [];
@@ -159,7 +168,7 @@ export function Layout() {
         }`}
       >
         <div className="flex items-center justify-between h-16 px-5 border-b border-gray-100">
-          <Link to="/dashboard" aria-label="Agromax — Inicio" onClick={() => setSidebarOpen(false)}>
+          <Link to={home} aria-label="Agromax — Inicio" onClick={() => setSidebarOpen(false)}>
             <BrandLogo variant="compact" decorative className="h-11 w-auto max-w-[180px]" />
           </Link>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-500">
@@ -170,7 +179,7 @@ export function Layout() {
         <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-5">
           {navSections.map((section) => {
             const visibleItems = section.items.filter(
-              (item) => !item.roles || item.roles.includes(user?.role || ''),
+              (item) => canAccessView(user?.role, item.path) && (!item.roles || item.roles.includes(user?.role || '')),
             );
             if (visibleItems.length === 0) return null;
             return (
@@ -239,7 +248,7 @@ export function Layout() {
             <button onClick={() => setSidebarOpen(true)} className="hidden">
               <Menu size={20} />
             </button>
-            <Link to="/dashboard" className="lg:hidden flex items-center gap-2" aria-label="Agromax — Inicio">
+            <Link to={home} className="lg:hidden flex items-center gap-2" aria-label="Agromax — Inicio">
               <BrandLogo variant="icon" decorative className="h-9 w-9 rounded-lg" />
               <span className="hidden min-[390px]:inline text-sm font-bold text-white">Agromax</span>
             </Link>
@@ -248,7 +257,7 @@ export function Layout() {
           <div className="flex min-w-0 flex-1 justify-end items-center gap-2 sm:gap-3">
             <BranchSelector branches={branches} selectedBranch={selectedBranch} onSelect={selectBranch} />
 
-            <div className="relative shrink-0" ref={bellRef}>
+            {!isSeller && <div className="relative shrink-0" ref={bellRef}>
               <button
                 onClick={() => setBellOpen(!bellOpen)}
                 className="relative w-10 h-10 flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 border border-white/20 text-white transition-colors"
@@ -349,7 +358,7 @@ export function Layout() {
                   )}
                 </div>
               )}
-            </div>
+            </div>}
           </div>
         </header>
 
@@ -360,7 +369,7 @@ export function Layout() {
         {/* Mobile Bottom Navigation Bar */}
         <nav className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 lg:hidden">
           <div className="flex items-stretch h-16">
-            {BOTTOM_NAV.map(({ path, label, icon: Icon }) => {
+            {bottomNav.map(({ path, label, icon: Icon }) => {
               const isActive = path === '/dashboard'
                 ? location.pathname === path || location.pathname === '/'
                 : location.pathname.startsWith(path);
@@ -436,7 +445,7 @@ export function Layout() {
           <div className="overflow-y-auto flex-1 px-4 py-3 space-y-4">
             {navSections.map((section) => {
               const visibleItems = section.items.filter(
-                (item) => !item.roles || item.roles.includes(user?.role || ''),
+                (item) => canAccessView(user?.role, item.path) && (!item.roles || item.roles.includes(user?.role || '')),
               );
               if (visibleItems.length === 0) return null;
               return (

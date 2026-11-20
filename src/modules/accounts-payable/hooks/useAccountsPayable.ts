@@ -10,8 +10,8 @@ export function useAccountPayableById(id: string | null) {
   return useQuery({ queryKey: ['accounts-payable', id], queryFn: () => accountPayableService.getById(id!), enabled: !!id });
 }
 
-export function useAPAlerts(days?: number) {
-  return useQuery({ queryKey: ['accounts-payable-alerts', days], queryFn: () => accountPayableService.getAlerts(days) });
+export function useAPAlerts(days?: number, enabled = true) {
+  return useQuery({ queryKey: ['accounts-payable-alerts', days], enabled, queryFn: () => accountPayableService.getAlerts(days) });
 }
 
 export function useRegisterAPPayment() {

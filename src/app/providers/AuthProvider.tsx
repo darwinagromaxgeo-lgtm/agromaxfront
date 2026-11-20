@@ -6,7 +6,7 @@ import { restoreSession } from '../../modules/auth/services/restoreSession';
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<User>;
   logout: () => void;
   isLoading: boolean;
   branches: Branch[];
@@ -97,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem('selectedBranchId', activeBranch.id);
       setSelectedBranch(activeBranch);
     }
+    return res.user as User;
   };
 
   const logout = () => {

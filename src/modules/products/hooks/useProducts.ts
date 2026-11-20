@@ -21,9 +21,10 @@ export function useDeleteProduct() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: productService.delete, onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success('Producto desactivado'); } });
 }
-export function usePriceFloorAlerts() {
+export function usePriceFloorAlerts(enabled = true) {
   return useQuery({
     queryKey: ['price-floor-alerts'],
+    enabled,
     queryFn: productService.getPriceFloorAlerts,
     staleTime: 2 * 60 * 1000,
   });

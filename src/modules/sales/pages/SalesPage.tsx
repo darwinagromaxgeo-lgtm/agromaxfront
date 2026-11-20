@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSales, useCreateSale, useCancelSale, useUpdateVoucher } from '../hooks/useSales';
 import { saleService } from '../services/saleService';
@@ -45,7 +46,9 @@ interface PaymentSplit {
 type PaymentMode = string; // paymentMethodId | 'MIXED' | 'CREDIT'
 
 export function SalesPage() {
-  const { selectedBranch } = useAuth();
+  const { selectedBranch, user } = useAuth();
+  const canManageSales = user?.role !== 'VENDEDOR';
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'sales' | 'boletas' | 'facturas' | 'loans'>('sales');
   const [page, setPage] = useState(1);
@@ -67,7 +70,7 @@ export function SalesPage() {
   const { data, isLoading } = useSales({ page, limit: 10, companyId: companyFilter || undefined, startDate, endDate });
   const { data: boletasData, isLoading: boletasLoading } = useSales({ page: boletaPage, limit: 10, companyId: companyFilter || undefined, startDate, endDate, voucherType: 'BOLETA' });
   const { data: facturasData, isLoading: facturasLoading } = useSales({ page: facturaPage, limit: 10, companyId: companyFilter || undefined, startDate, endDate, voucherType: 'FACTURA' });
-  const { data: loansData, isLoading: loansLoading } = useLoans({ page: loanPage, limit: 10, status: loanStatusFilter || undefined, startDate, endDate });
+  const { data: loansData, isLoading: loansLoading } = useLoans({ page: loanPage, limit: 10, status: loanStatusFilter || undefined, startDate, endDate }, canManageSales);
   const { data: companies } = useCompanies();
   const { data: productsData } = useProducts({ limit: 2000 });
   const { data: clientsData } = useClients({ limit: 200 });
@@ -130,6 +133,7 @@ export function SalesPage() {
 
   // Sale form handlers
   const openCreate = () => {
+    if (!canManageSales) { navigate('/pos'); return; }
     const defaultMethodId = paymentMethods.length > 0 ? paymentMethods[0].id : '';
     setForm({
       clientId: '', voucherType: 'NONE', paymentMode: defaultMethodId,
@@ -318,7 +322,7 @@ export function SalesPage() {
   const fiscalDocuments = salesBilling.data || [];
   const fiscalKnown = salesBilling.isSuccess;
   const documentsForSale = (sale: Sale) => saleFiscalDocuments(fiscalDocuments, sale.id);
-  const canCancelSale = (sale: Sale) => fiscalKnown && !billingBlocksCancellation(documentsForSale(sale));
+  const canCancelSale = (sale: Sale) => canManageSales && fiscalKnown && !billingBlocksCancellation(documentsForSale(sale));
   const viewingDocuments = viewingSale ? documentsForSale(viewingSale) : [];
   const viewingAsNote = !!viewingSale && fiscalKnown && saleUsesInternalNote(viewingSale, viewingDocuments);
   const renderComprobante = (sale: Sale) => <SaleBillingBadge sale={sale} documents={documentsForSale(sale)} loading={!fiscalKnown && !salesBilling.isError} error={salesBilling.isError} />;
@@ -495,9 +499,9 @@ export function SalesPage() {
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Receipt size={24} /> Ventas</h1>
         <div className="flex flex-col sm:flex-row gap-2">
           <button type="button" onClick={() => { void queryClient.invalidateQueries({ queryKey: ['sales'] }); void salesBilling.refetch(); }} className="flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm text-gray-700"><RefreshCw size={16} /> Actualizar</button>
-          <button onClick={openLoanCreate} className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+          {canManageSales && <button onClick={openLoanCreate} className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
             <HandshakeIcon size={18} /> Préstamo
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -600,7 +604,7 @@ export function SalesPage() {
           { id: 'boletas',  label: 'Boletas',    activeColor: 'border-primary-600 text-primary-600' },
           { id: 'facturas', label: 'Facturas',   activeColor: 'border-blue-600 text-blue-600' },
           { id: 'loans',    label: 'Préstamos',  activeColor: 'border-purple-600 text-purple-600' },
-        ] as const).map(tab => (
+        ] as const).filter(tab => canManageSales || tab.id !== 'loans').map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`whitespace-nowrap flex-shrink-0 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? tab.activeColor : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
             {tab.label}
@@ -988,7 +992,7 @@ export function SalesPage() {
 
             {!fiscalKnown ? <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-600">{salesBilling.isError ? 'Estado de comprobantes no disponible. Pulsa Actualizar.' : 'Consultando los comprobantes guardados…'}</p>
               : viewingDocuments.length > 0 ? <SaleBillingDocuments documents={viewingDocuments} onPreview={setNotePreview} />
-                : viewingSale.voucherType !== 'NONE' && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p>Esta venta aún no tiene un comprobante emitido a SUNAT.</p><a href={`/billing?saleId=${viewingSale.id}`} className="mt-2 inline-block font-semibold underline">Preparar comprobante en Facturación</a></div>}
+                : viewingSale.voucherType !== 'NONE' && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p>Esta venta aún no tiene un comprobante emitido a SUNAT.</p>{canManageSales ? <a href={`/billing?saleId=${viewingSale.id}`} className="mt-2 inline-block font-semibold underline">Preparar comprobante en Facturación</a> : <p className="mt-2">Solicita la revisión del administrador.</p>}</div>}
 
             {viewingAsNote && <div className="flex flex-wrap justify-end gap-2">
               <button type="button" onClick={() => {

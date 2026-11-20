@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { loanService } from '../services/loanService';
 import toast from 'react-hot-toast';
 
-export function useLoans(params?: any) {
-  return useQuery({ queryKey: ['loans', params], queryFn: () => loanService.getAll(params) });
+export function useLoans(params?: any, enabled = true) {
+  return useQuery({ queryKey: ['loans', params], enabled, queryFn: () => loanService.getAll(params) });
 }
 
 export function useCreateLoan() {

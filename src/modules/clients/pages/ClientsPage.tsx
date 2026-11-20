@@ -13,7 +13,8 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../../../app/providers/AuthProvider';
 
 export function ClientsPage() {
-  const { selectedBranch } = useAuth();
+  const { selectedBranch, user } = useAuth();
+  const canViewCreditStatements = user?.role !== 'VENDEDOR';
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search);
@@ -99,7 +100,7 @@ export function ClientsPage() {
     { key: 'isActive', header: 'Estado', render: (item: Client) => <span className={`px-2 py-1 rounded-full text-xs ${item.isActive ? 'bg-primary-100 text-primary-800' : 'bg-red-100 text-red-800'}`}>{item.isActive ? 'Activo' : 'Inactivo'}</span> },
     { key: 'actions', header: 'Acciones', render: (item: Client) => (
       <div className="flex items-center gap-2">
-        <ExportClientStatementButton client={item} variant="icon" />
+        {canViewCreditStatements && <ExportClientStatementButton client={item} variant="icon" />}
         <button onClick={() => openEdit(item)} className="text-blue-600 hover:text-blue-800" title="Editar"><Edit2 size={16} /></button>
       </div>
     )},
@@ -148,7 +149,7 @@ export function ClientsPage() {
               {client.address && <span className="truncate max-w-[200px]">{client.address}</span>}
             </div>
             <div className="flex gap-2">
-              <ExportClientStatementButton client={client} variant="icon" />
+              {canViewCreditStatements && <ExportClientStatementButton client={client} variant="icon" />}
               <button onClick={() => openEdit(client)} className="flex items-center justify-center gap-1.5 flex-1 py-2 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                 <Edit2 size={13} /> Editar
               </button>

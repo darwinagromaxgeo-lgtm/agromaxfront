@@ -4,6 +4,8 @@ import { LoginPage } from '../../modules/auth/pages/LoginPage';
 import { ProtectedRoute } from '../../modules/auth/components/ProtectedRoute';
 import { Layout } from '../../shared/components/Layout';
 import { AppLoading } from '../../shared/components/AppLoading';
+import { useAuth } from '../providers/AuthProvider';
+import { roleHome } from '../../shared/utils/accessPolicy';
 
 const ProductsPage = lazy(() => import('../../modules/products/pages/ProductsPage').then(m => ({ default: m.ProductsPage })));
 const PurchasesPage = lazy(() => import('../../modules/purchases/pages/PurchasesPage').then(m => ({ default: m.PurchasesPage })));
@@ -37,12 +39,17 @@ const BranchesPage = lazy(() => import('../../modules/branches/pages/BranchesPag
 
 const Loading = AppLoading;
 
+function RoleHome() {
+  const { user } = useAuth();
+  return <Navigate to={roleHome(user?.role)} replace />;
+}
+
 export function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={<RoleHome />} />
         <Route path="dashboard" element={<Suspense fallback={<Loading />}><DashboardPage /></Suspense>} />
         <Route path="products" element={<Suspense fallback={<Loading />}><ProductsPage /></Suspense>} />
         <Route path="purchase/new" element={<Navigate to="/purchases/new" replace />} />
