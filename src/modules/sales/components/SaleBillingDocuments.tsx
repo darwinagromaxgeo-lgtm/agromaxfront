@@ -4,13 +4,13 @@ import toast from 'react-hot-toast';
 import { billingService } from '../../billing/services/billingService';
 import type { BillingDocument } from '../../billing/types';
 import type { Sale } from '../../../shared/types';
-import { billingBlocksCancellation, billingReference, fiscalDocumentState } from '../utils/saleBilling';
+import { activeFiscalDocuments, billingBlocksCancellation, billingReference, fiscalDocumentState, saleUsesInternalNote } from '../utils/saleBilling';
 
 export function SaleBillingBadge({ sale, documents, loading, error }: { sale: Sale; documents: BillingDocument[]; loading: boolean; error: boolean }) {
   if (loading) return <span className="text-xs text-gray-400">Consultando comprobante…</span>;
   if (error) return <span className="text-xs text-amber-700">Estado no disponible</span>;
   if (!documents.length) return <span className="text-xs text-gray-500">{sale.voucherType === 'NONE' ? 'Nota de venta' : `${sale.voucherType === 'FACTURA' ? 'Factura' : 'Boleta'} · sin emitir`}</span>;
-  return <div className="space-y-1.5">{documents.map(document => <div key={document.id} className="flex flex-wrap items-center gap-1.5">
+  return <div className="space-y-1.5">{saleUsesInternalNote(sale, documents) && <p className="text-xs font-semibold text-slate-700">Nota de venta</p>}{documents.map(document => <div key={document.id} className="flex flex-wrap items-center gap-1.5">
     <span className="font-mono text-xs font-semibold text-slate-800">{billingReference(document)}</span>
     <span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${fiscalDocumentState(document).color}`}>{fiscalDocumentState(document).label}</span>
     {document.environment === 'beta' && <span className="text-[10px] text-slate-500">Pruebas</span>}
@@ -37,6 +37,8 @@ export function SaleBillingDocuments({ documents, onPreview }: { documents: Bill
         {(['pdf', 'xml', 'cdr'] as const).filter(format => document[format === 'pdf' ? 'hasPdf' : format === 'xml' ? 'hasXml' : 'hasCdr']).map(format => <button key={format} type="button" disabled={!!downloading} onClick={() => void download(document, format)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-gray-700 disabled:opacity-50">{downloading === `${document.id}:${format}` ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}{format === 'pdf' ? 'PDF emitido' : format.toUpperCase()}</button>)}
       </div>
     </article>)}
-    {billingBlocksCancellation(documents) && <p className="text-xs text-slate-500">El tipo de comprobante se conserva. Esta venta tiene una emisión enviada o pendiente de verificar; la anulación operativa no está disponible.</p>}
+    {documents.length > 0 && !activeFiscalDocuments(documents).length
+      ? <p className="text-xs text-slate-500">La venta queda como nota de venta. Los comprobantes anulados se conservan como historial, junto con sus notas de crédito. Los productos y pagos del pedido se mantienen.</p>
+      : billingBlocksCancellation(documents) && <p className="text-xs text-slate-500">Esta venta tiene una emisión enviada o pendiente de verificar; la anulación operativa no está disponible.</p>}
   </section>;
 }

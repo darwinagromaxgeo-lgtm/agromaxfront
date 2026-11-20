@@ -37,7 +37,7 @@ function CreditNoteForm({ branchId,initialOriginalId,onSaved,onClose }:{ branchI
   const create=useMutation({ mutationFn:creditNoteService.create,onSuccess:onSaved,onError:error=>toast.error(errorMessage(error)) });
   const active=availability.data?.notes.find(note=>['DRAFT','SENDING','PENDING','UNKNOWN'].includes(note.status));
   return <div className="space-y-4">
-    <p className="text-sm text-gray-600">Anula el comprobante completo mediante una nota de crédito. El pedido, el stock y los cobros se conservan. Cuando SUNAT acepte la nota, podrás emitir nuevamente el mismo pedido.</p>
+    <p className="text-sm text-gray-600">Anula el comprobante completo mediante una nota de crédito. Cuando SUNAT acepte la anulación y no queden otros comprobantes activos, el pedido pasará automáticamente a nota de venta. El stock y los cobros se conservan, y podrás emitir nuevamente el mismo pedido.</p>
     <label className="block text-sm font-medium">Comprobante original<select className={`${input} mt-1`} value={originalId} disabled={create.isPending} onChange={event=>setOriginalId(event.target.value)}>
       <option value="">Selecciona una factura o boleta aceptada</option>
       {originalId && !originals.data?.data.some(doc=>doc.id===originalId) && <option value={originalId}>{availability.data ? reference(availability.data.original) : 'Comprobante seleccionado'}</option>}
@@ -55,7 +55,7 @@ function CreditNoteForm({ branchId,initialOriginalId,onSaved,onClose }:{ branchI
       <label className="block text-sm">Motivo de la anulación<textarea maxLength={500} className={`${input} mt-1`} value={reason} onChange={event=>setReason(event.target.value)} rows={2} placeholder="Ej.: anular el comprobante para emitir uno nuevo" /></label>
       {preview.error && inputKey===JSON.stringify(previewInput) && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{errorMessage(preview.error)}</p>}
       {previewReady && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-green-50 p-4"><div><p className="font-semibold">Importe del comprobante a anular: {money(preview.data!.total)}</p><p className="text-xs text-gray-600">Motivo 01: anulación · IGV {money(preview.data!.taxAmount)}</p></div><button className={button} onClick={()=>setPaper(true)}><Eye size={16} /> Vista previa</button></div>}
-      <p className="text-xs text-gray-500">La nota se aplica al comprobante fiscal completo. El pedido conserva sus productos, stock y pagos.</p>
+      <p className="text-xs text-gray-500">Al aceptarse la última anulación, la venta queda como nota de venta y conserva sus productos, stock y pagos.</p>
     </>}
     <div className="flex justify-end gap-2"><button className={button} onClick={onClose} disabled={create.isPending}>Cerrar</button><button className={primary} disabled={!previewReady || !!active || create.isPending} onClick={()=>draftInput && create.mutate({ ...draftInput,requestId })}>{create.isPending?'Guardando…':'Guardar borrador'}</button></div>
     <BillingPreviewModal isOpen={paper && previewReady} onClose={()=>setPaper(false)} document={preview.data || null} />
@@ -82,6 +82,7 @@ export function CreditNotesPanel({ branchId,connection,initialOriginalId,onOrigi
   const refresh=(result:BillingCreditNote)=>{
     client.invalidateQueries({ queryKey:['billing-credit-notes'] });client.invalidateQueries({ queryKey:['credit-note-availability'] });
     client.invalidateQueries({queryKey:['billing']});client.invalidateQueries({queryKey:['billing-detail']});client.invalidateQueries({queryKey:['sales-billing']});
+    client.invalidateQueries({queryKey:['sales']});
     if(result.branchId!==activeBranch.current)return;
     client.setQueryData(['credit-note-detail',result.branchId,result.id],result);setDetailId(result.id);setConfirm(false);
   };

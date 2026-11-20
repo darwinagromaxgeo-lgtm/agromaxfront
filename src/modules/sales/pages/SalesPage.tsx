@@ -20,7 +20,7 @@ import { BillingPreviewModal } from '../../billing/components/BillingPreviewModa
 import type { BillingPrintDocument } from '../../billing/utils/printTypes';
 import { billingService } from '../../billing/services/billingService';
 import { SaleBillingBadge, SaleBillingDocuments } from '../components/SaleBillingDocuments';
-import { billingBlocksCancellation, saleFiscalDocuments, voucherExportRows } from '../utils/saleBilling';
+import { billingBlocksCancellation, saleFiscalDocuments, saleUsesInternalNote, saleVoucherLabel, voucherExportRows } from '../utils/saleBilling';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import type { Sale, Loan, Company, Product, ProductPrice, Client, PriceTier, PaymentMethod, Stock } from '../../../shared/types';
@@ -320,6 +320,7 @@ export function SalesPage() {
   const documentsForSale = (sale: Sale) => saleFiscalDocuments(fiscalDocuments, sale.id);
   const canCancelSale = (sale: Sale) => fiscalKnown && !billingBlocksCancellation(documentsForSale(sale));
   const viewingDocuments = viewingSale ? documentsForSale(viewingSale) : [];
+  const viewingAsNote = !!viewingSale && fiscalKnown && saleUsesInternalNote(viewingSale, viewingDocuments);
   const renderComprobante = (sale: Sale) => <SaleBillingBadge sale={sale} documents={documentsForSale(sale)} loading={!fiscalKnown && !salesBilling.isError} error={salesBilling.isError} />;
 
   const companyMap = useMemo(() => new Map<string, Company>(companyList.map((c: Company) => [c.id, c])), [companyList]);
@@ -963,7 +964,7 @@ export function SalesPage() {
                 <span className="block text-xs text-gray-500 mb-1">Comprobante</span>
                 {viewingSale.isCancelled || !fiscalKnown || viewingDocuments.length > 0 ? (
                   <span className={`text-sm font-medium ${viewingSale.voucherType === 'BOLETA' ? 'text-primary-600' : viewingSale.voucherType === 'FACTURA' ? 'text-blue-600' : 'text-gray-500'}`}>
-                    {viewingDocuments.length ? [...new Set(viewingDocuments.map(document => document.documentType === 'FACTURA' ? 'Factura' : 'Boleta'))].join(' / ') : viewingSale.voucherType === 'BOLETA' ? 'Boleta' : viewingSale.voucherType === 'FACTURA' ? 'Factura' : 'Nota de venta'}
+                    {fiscalKnown ? saleVoucherLabel(viewingSale, viewingDocuments) : viewingSale.voucherType === 'BOLETA' ? 'Boleta' : viewingSale.voucherType === 'FACTURA' ? 'Factura' : 'Nota de venta'}
                   </span>
                 ) : (
                   <div className="flex gap-1">
@@ -989,21 +990,21 @@ export function SalesPage() {
               : viewingDocuments.length > 0 ? <SaleBillingDocuments documents={viewingDocuments} onPreview={setNotePreview} />
                 : viewingSale.voucherType !== 'NONE' && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p>Esta venta aún no tiene un comprobante emitido a SUNAT.</p><a href={`/billing?saleId=${viewingSale.id}`} className="mt-2 inline-block font-semibold underline">Preparar comprobante en Facturación</a></div>}
 
-            {fiscalKnown && !viewingDocuments.length && viewingSale.voucherType === 'NONE' && <div className="flex flex-wrap justify-end gap-2">
-              {viewingSale.voucherType === 'NONE' && <button type="button" onClick={() => {
-                try { setNotePreview(saleNoteDocument({ ...getSalePdfParams(viewingSale), branchId: selectedBranch?.id || '' })); }
+            {viewingAsNote && <div className="flex flex-wrap justify-end gap-2">
+              <button type="button" onClick={() => {
+                try { setNotePreview(saleNoteDocument({ ...getSalePdfParams({ ...viewingSale, voucherType: 'NONE' }), branchId: selectedBranch?.id || '' })); }
                 catch { toast.error('No se pudo preparar la nota de venta'); }
-              }} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 text-sm font-medium"><Eye size={15} /> Nota de venta · A4 y ticket</button>}
+              }} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 text-sm font-medium"><Eye size={15} /> Nota de venta · A4 y ticket</button>
               <button
                 type="button"
-                onClick={() => openSalePdf(getSalePdfParams(viewingSale))}
+                onClick={() => openSalePdf(getSalePdfParams({ ...viewingSale, voucherType: 'NONE' }))}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 text-sm font-medium transition-colors"
               >
                 <Printer size={15} /> Ver / imprimir PDF
               </button>
               <button
                 type="button"
-                onClick={() => downloadSalePdf(getSalePdfParams(viewingSale))}
+                onClick={() => downloadSalePdf(getSalePdfParams({ ...viewingSale, voucherType: 'NONE' }))}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium transition-colors"
               >
                 <Download size={15} /> Descargar PDF

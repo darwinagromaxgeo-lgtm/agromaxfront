@@ -13,6 +13,14 @@ export const saleBillingStates: Record<BillingStatus, { label: string; color: st
 export const billingReference = (document: BillingDocument) => document.series && document.number ? `${document.series}-${String(document.number).padStart(8, '0')}` : 'Sin numeración';
 export const fiscalDocumentState = (document:BillingDocument) => document.cancelledByCreditNoteId ? {label:'Anulado por nota de crédito',color:'bg-gray-100 text-gray-600'} : saleBillingStates[document.status];
 export const saleFiscalDocuments = (documents: BillingDocument[], saleId: string) => documents.filter(document => document.saleId === saleId && document.status !== 'DISCARDED');
+export const activeFiscalDocuments = (documents: BillingDocument[]) => documents.filter(document => document.status !== 'DISCARDED' && !document.cancelledByCreditNoteId);
+export const saleUsesInternalNote = (sale: Sale, documents: BillingDocument[]) => !activeFiscalDocuments(documents).length && (sale.voucherType === 'NONE' || documents.some(document => !!document.cancelledByCreditNoteId));
+export function saleVoucherLabel(sale: Sale, documents: BillingDocument[]) {
+  const active = activeFiscalDocuments(documents);
+  if (active.length) return [...new Set(active.map(document => document.documentType === 'FACTURA' ? 'Factura' : 'Boleta'))].join(' / ');
+  if (saleUsesInternalNote(sale, documents)) return 'Nota de venta';
+  return sale.voucherType === 'FACTURA' ? 'Factura' : 'Boleta';
+}
 export const billingBlocksCancellation = (documents: BillingDocument[]) => documents.some(document => ['SENDING', 'PENDING', 'ACCEPTED', 'UNKNOWN'].includes(document.status));
 
 export function voucherExportRows(sales: Sale[], documents: BillingDocument[], context: { clients: Map<string, Client>; companies: Map<string, Company>; products: Map<string, Product> }) {
