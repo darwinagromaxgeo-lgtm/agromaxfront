@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { api } from '../../shared/services/api';
 import type { Branch, User } from '../../shared/types';
 import { restoreSession } from '../../modules/auth/services/restoreSession';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AuthContextType {
   user: User | null;
@@ -18,6 +19,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [isLoading, setIsLoading] = useState(true);
@@ -62,6 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setSessionUnavailable(false);
     } else if (result.status === 'EXPIRED') {
+      queryClient.clear();
       localStorage.removeItem('token');
       localStorage.removeItem('selectedBranchId');
       setToken(null);
@@ -71,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSessionUnavailable(false);
     } else setSessionUnavailable(true);
     setIsLoading(false);
-  }, [token]);
+  }, [token, queryClient]);
 
   useEffect(() => { fetchUser(); }, [fetchUser]);
   useEffect(() => {
@@ -84,6 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (username: string, password: string) => {
     const { data } = await api.post('/auth/login', { username, password });
     const res = data.data;
+    queryClient.clear();
     localStorage.setItem('token', res.accessToken);
     setToken(res.accessToken);
     setUser(res.user);
@@ -101,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    queryClient.clear();
     localStorage.removeItem('token');
     setToken(null);
     setUser(null);
