@@ -10,10 +10,11 @@ import {
 import type { CashRegister, CashRegisterEntry } from '../../../shared/types';
 import { getTodayDateString, getMonthRange } from '../../../shared/utils/date.util';
 import { groupEntries } from '../utils/groupEntries';
+import { CashCloseForm } from '../components/CashCloseForm';
+import { CashMethodBreakdown, CashCountResult, cashCategoryLabels } from '../components/CashOverview';
+import { entryPaymentMethod, summarizeCash } from '../utils/cashSummary';
 
-const categoryLabels: Record<string, string> = {
-  SALE: 'Venta', CREDIT_PAYMENT: 'Pago Crédito', PURCHASE: 'Compra', ADJUSTMENT: 'Ajuste', OTHER: 'Otro',
-};
+const categoryLabels = cashCategoryLabels;
 
 function formatDate(dateStr: string) {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('es-PE', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
@@ -35,7 +36,6 @@ export function CashRegisterHistoryPage() {
   const [showDetail, setShowDetail] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeTarget, setCloseTarget] = useState<CashRegister | null>(null);
-  const [closeNotes, setCloseNotes] = useState('');
   const [expandedDetailGroups, setExpandedDetailGroups] = useState<Set<string>>(new Set());
 
   const { data, isLoading } = useCashRegisters({ page, limit: 20, startDate: startDate || undefined, endDate: endDate || undefined });
@@ -47,12 +47,8 @@ export function CashRegisterHistoryPage() {
   const today = getTodayDateString();
 
   const openDetail = (reg: CashRegister) => { setSelectedId(reg.id); setExpandedDetailGroups(new Set()); setShowDetail(true); };
-  const openClose = (reg: CashRegister) => { setCloseTarget(reg); setCloseNotes(''); setShowCloseModal(true); };
-  const handleClose = async () => {
-    if (!closeTarget) return;
-    await closeRegister.mutateAsync({ registerId: closeTarget.id, data: { notes: closeNotes } });
-    setShowCloseModal(false);
-  };
+  const openClose = (reg: CashRegister) => { setCloseTarget(reg); setShowCloseModal(true); };
+
 
   const toggleDetailGroup = (id: string) => setExpandedDetailGroups(prev => {
     const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
@@ -86,7 +82,7 @@ export function CashRegisterHistoryPage() {
         </span>
         {e.createdAt && (
           <div className="text-[10px] text-gray-400 mt-0.5 font-mono">
-            {new Date(e.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+            {new Date(e.createdAt).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' })}
           </div>
         )}
       </td>
@@ -98,6 +94,7 @@ export function CashRegisterHistoryPage() {
       <td className="px-3 py-2.5">
         <div className="text-xs text-gray-700 leading-snug">
           {e.description.replace(/\s*\[.*?\]\s*$/, '')}
+          <div className="mt-1 font-semibold text-gray-500">{entryPaymentMethod(e) || 'Método sin identificar'}</div>
         </div>
         {e.isDeleted && <div className="text-[10px] text-red-500 mt-0.5 font-medium">✕ Anulado</div>}
       </td>
@@ -172,14 +169,14 @@ export function CashRegisterHistoryPage() {
         <div className="grid grid-cols-2 gap-4 mb-5">
           <div className="bg-white rounded-xl border border-primary-100 shadow-sm px-5 py-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-semibold text-primary-500 uppercase tracking-wide">Total ingresos del período</p>
+              <p className="text-[11px] font-semibold text-primary-500 uppercase tracking-wide">Ingresos de esta página</p>
               <div className="p-1.5 bg-primary-50 rounded-lg"><TrendingUp size={13} className="text-primary-500" /></div>
             </div>
             <p className="text-xl font-bold text-primary-700">+ S/ {periodSummary.totalIncome.toFixed(2)}</p>
           </div>
           <div className="bg-white rounded-xl border border-red-100 shadow-sm px-5 py-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-semibold text-red-400 uppercase tracking-wide">Total egresos del período</p>
+              <p className="text-[11px] font-semibold text-red-400 uppercase tracking-wide">Egresos de esta página</p>
               <div className="p-1.5 bg-red-50 rounded-lg"><TrendingDown size={13} className="text-red-400" /></div>
             </div>
             <p className="text-xl font-bold text-red-600">− S/ {periodSummary.totalExpense.toFixed(2)}</p>
@@ -332,6 +329,7 @@ export function CashRegisterHistoryPage() {
             </div>
           </div>
 
+          {detail && <><CashCountResult register={detail} /><CashMethodBreakdown methods={detail.cashCount?.methods || summarizeCash(detail.openingBalance, detail.entries).methods} /></>}
           {/* Entries */}
           <div className="border border-gray-100 rounded-xl overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50/60 border-b border-gray-100">
@@ -404,38 +402,8 @@ export function CashRegisterHistoryPage() {
         </div>
       </Modal>
 
-      {/* ── Modal cerrar ── */}
-      <Modal isOpen={showCloseModal} onClose={() => setShowCloseModal(false)}
-        title={`Cerrar Caja — ${closeTarget?.date ? formatDate(closeTarget.date) : ''}`}>
-        <div className="space-y-4">
-          <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-sm text-amber-800">
-            Esta caja quedó abierta sin cerrarse. Al cerrarla no se podrán modificar sus entradas.
-          </div>
-          {closeTarget && (() => {
-            const { income, expense } = calcTotals(closeTarget.entries);
-            const net = (closeTarget.openingBalance || 0) + income - expense;
-            return (
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-1.5 text-sm">
-                <div className="flex justify-between text-gray-600"><span>Balance apertura</span><span className="font-medium">S/ {closeTarget.openingBalance.toFixed(2)}</span></div>
-                <div className="flex justify-between text-primary-600"><span>+ Total ingresos</span><span className="font-semibold">S/ {income.toFixed(2)}</span></div>
-                <div className="flex justify-between text-red-600"><span>− Total egresos</span><span className="font-semibold">S/ {expense.toFixed(2)}</span></div>
-                <div className="flex justify-between font-bold text-gray-800 pt-2 mt-1 border-t border-gray-200">
-                  <span>Balance de cierre</span><span>S/ {net.toFixed(2)}</span>
-                </div>
-              </div>
-            );
-          })()}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notas <span className="text-gray-400 font-normal">(opcional)</span></label>
-            <textarea value={closeNotes} onChange={e => setCloseNotes(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" rows={2} />
-          </div>
-          <button onClick={handleClose} disabled={closeRegister.isPending}
-            className="w-full py-2.5 bg-gray-800 text-white rounded-xl hover:bg-gray-900 disabled:opacity-50 font-semibold transition-colors flex items-center justify-center gap-2">
-            <Lock size={15} />
-            {closeRegister.isPending ? 'Cerrando...' : 'Confirmar cierre'}
-          </button>
-        </div>
+      <Modal isOpen={showCloseModal} onClose={() => setShowCloseModal(false)} title={`Cerrar caja — ${closeTarget?.date || ''}`}>
+        {closeTarget && <CashCloseForm register={closeTarget} pending={closeRegister.isPending} onSubmit={async data => { await closeRegister.mutateAsync({ registerId: closeTarget.id, data }); setShowCloseModal(false); }} />}
       </Modal>
     </div>
   );

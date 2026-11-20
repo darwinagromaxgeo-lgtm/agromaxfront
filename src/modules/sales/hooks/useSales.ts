@@ -16,6 +16,8 @@ export function useCreateSale() {
       qc.invalidateQueries({ queryKey: ['product-lots-expiring'] });
       qc.invalidateQueries({ queryKey: ['kardex'] });
       qc.invalidateQueries({ queryKey: ['cash-register-today'] });
+      qc.invalidateQueries({ queryKey: ['cash-registers'] });
+      qc.invalidateQueries({ queryKey: ['cash-register'] });
       qc.invalidateQueries({ queryKey: ['credits'] });
       qc.invalidateQueries({ queryKey: ['credit'] });
       toast.success('Venta registrada');
@@ -38,6 +40,8 @@ export function useCancelSale() {
       qc.invalidateQueries({ queryKey: ['product-lots-expiring'] });
       qc.invalidateQueries({ queryKey: ['kardex'] });
       qc.invalidateQueries({ queryKey: ['cash-register-today'] });
+      qc.invalidateQueries({ queryKey: ['cash-registers'] });
+      qc.invalidateQueries({ queryKey: ['cash-register'] });
       qc.invalidateQueries({ queryKey: ['credit-accounts'] });
       toast.success('Venta anulada');
     },

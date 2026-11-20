@@ -18,7 +18,9 @@ export function useRegisterPayment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ creditId, data }: { creditId: string; data: any }) => creditService.registerPayment(creditId, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['credits'] }); qc.invalidateQueries({ queryKey: ['cash-register-today'] }); toast.success('Pago registrado'); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['credits'] }); qc.invalidateQueries({ queryKey: ['cash-register-today'] });
+      qc.invalidateQueries({ queryKey: ['cash-registers'] });
+      qc.invalidateQueries({ queryKey: ['cash-register'] }); toast.success('Pago registrado'); },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Error al registrar pago'),
   });
 }
@@ -29,6 +31,8 @@ export function useBatchPayment() {
     onSuccess: (_data, vars: any) => {
       qc.invalidateQueries({ queryKey: ['credits'] });
       qc.invalidateQueries({ queryKey: ['cash-register-today'] });
+      qc.invalidateQueries({ queryKey: ['cash-registers'] });
+      qc.invalidateQueries({ queryKey: ['cash-register'] });
       qc.invalidateQueries({ queryKey: ['cash-registers'] });
       if (vars?.clientId) qc.invalidateQueries({ queryKey: ['credits', 'open', vars.clientId] });
       toast.success('Pago registrado');

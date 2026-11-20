@@ -10,33 +10,18 @@ export interface EntryGroup {
 }
 
 export function groupEntries(entries: CashRegisterEntry[]): EntryGroup[] {
-  const byId = new Map<string, CashRegisterEntry[]>();
-  const singletons: CashRegisterEntry[] = [];
-
+  const byId = new Map<string, EntryGroup>();
+  const groups: EntryGroup[] = [];
   for (const entry of entries) {
     if (entry.paymentGroupId) {
-      const arr = byId.get(entry.paymentGroupId) || [];
-      arr.push(entry);
-      byId.set(entry.paymentGroupId, arr);
+      const key = `${entry.paymentGroupId}:${Boolean(entry.isDeleted)}`;
+      let group = byId.get(key);
+      if (!group) { group = { groupId: key, entries: [], total: 0 }; byId.set(key, group); groups.push(group); }
+      group.entries.push(entry);
+      group.total = (Math.round((group.total || 0) * 100) + Math.round(entry.amount * 100)) / 100;
     } else {
-      singletons.push(entry);
+      groups.push({ entries: [entry] });
     }
   }
-
-  const groups: EntryGroup[] = [];
-  for (const [groupId, groupEntries] of byId.entries()) {
-    if (groupEntries.length === 1) {
-      singletons.push(groupEntries[0]);
-      continue;
-    }
-    const total = groupEntries[0].paymentGroupTotal
-      ?? groupEntries.reduce((s, e) => s + e.amount, 0);
-    groups.push({ groupId, total, entries: groupEntries });
-  }
-
-  for (const entry of singletons) {
-    groups.push({ entries: [entry] });
-  }
-
   return groups;
 }

@@ -5,12 +5,16 @@ import { usePaymentMethods } from '../../payment-methods/hooks/usePaymentMethods
 import { useRucLookup } from '../../../shared/hooks/useLookup';
 import { useSupplierByRuc, useCreateSupplier } from '../../suppliers/hooks/useSuppliers';
 import { Modal } from '../../../shared/components/Modal';
-import { Wallet, TrendingUp, TrendingDown, Edit2, Trash2, Lock, History, ChevronDown, ChevronRight, Layers, Search, Loader2, SlidersHorizontal, Receipt, ArrowRightLeft } from 'lucide-react';
-import type { CashRegisterEntry } from '../../../shared/types';
+import { Wallet, TrendingUp, TrendingDown, Edit2, Trash2, Lock, History, ChevronDown, ChevronRight, Layers, Search, Loader2, SlidersHorizontal, Receipt, RefreshCw, Download } from 'lucide-react';
+import type { CashRegister, CashRegisterEntry, PaymentMethod } from '../../../shared/types';
 import { groupEntries } from '../utils/groupEntries';
+import { CashOverview, cashCategoryLabels } from '../components/CashOverview';
+import { CashCloseForm } from '../components/CashCloseForm';
+import { entryPaymentMethod, cashMethodKey, summarizeCash } from '../utils/cashSummary';
+import { filterCashEntries, downloadMovements } from '../utils/cashMovements';
 
 export function CashRegisterPage() {
-  const { data: register, isLoading } = useCashRegisterToday();
+  const { data: register, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useCashRegisterToday();
   const openCashRegister = useOpenCashRegister();
   const addEntry = useAddCashEntry();
   const editEntry = useEditCashEntry();
@@ -25,18 +29,20 @@ export function CashRegisterPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeTarget, setCloseTarget] = useState<CashRegister | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<CashRegisterEntry | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
-  const { data: paymentMethods = [] } = usePaymentMethods();
+  const { data: methodsData } = usePaymentMethods();
+  const paymentMethods: PaymentMethod[] = methodsData || [];
   const rucLookup = useRucLookup();
   const supplierByRuc = useSupplierByRuc();
   const createSupplier = useCreateSupplier();
 
-  const [addForm, setAddForm] = useState({ type: 'INCOME' as string, category: 'OTHER' as string, description: '', amount: 0, voucherType: 'NONE' as string, voucherSeries: '', voucherNumber: '', paymentMethodName: '', remisionSerie: '', remisionCorrelativo: '', remisionFecha: '' });
-  const [editForm, setEditForm] = useState({ amount: 0, reason: '', voucherType: 'NONE' as string, voucherSeries: '', voucherNumber: '' });
+  const [addForm, setAddForm] = useState({ type: 'INCOME' as string, category: 'OTHER' as string, description: '', amount: 0, voucherType: 'NONE' as string, voucherSeries: '', voucherNumber: '', paymentMethodId: '', remisionSerie: '', remisionCorrelativo: '', remisionFecha: '' });
+  const [editForm, setEditForm] = useState({ amount: 0, reason: '', paymentMethodId: '', voucherType: 'NONE' as string, voucherSeries: '', voucherNumber: '' });
   const [deleteReason, setDeleteReason] = useState('');
-  const [closeNotes, setCloseNotes] = useState('');
+  const [filters, setFilters] = useState({ search: '', type: '', category: '', method: '', showDeleted: false });
   const [rucInput, setRucInput] = useState('');
   const [rucFound, setRucFound] = useState('');
   const [rucLoading, setRucLoading] = useState(false);
@@ -44,13 +50,13 @@ export function CashRegisterPage() {
   const isClosed = register?.status === 'CLOSED';
   const entries: CashRegisterEntry[] = register?.entries || [];
   const activeEntries = entries.filter(e => !e.isDeleted);
-  const totalIncome = activeEntries.filter(e => e.type === 'INCOME').reduce((sum, e) => sum + e.amount, 0);
-  const totalExpense = activeEntries.filter(e => e.type === 'EXPENSE').reduce((sum, e) => sum + e.amount, 0);
-  const netBalance = (register?.openingBalance || 0) + totalIncome - totalExpense;
+  const summary = summarizeCash(register?.openingBalance || 0, entries);
+  const netBalance = summary.balance;
+  const filteredEntries = filterCashEntries(entries, filters);
 
-  const openAddIncome = () => { setAddForm({ type: 'INCOME', category: 'OTHER', description: '', amount: 0, voucherType: 'NONE', voucherSeries: '', voucherNumber: '', paymentMethodName: '', remisionSerie: '', remisionCorrelativo: '', remisionFecha: '' }); setShowAddModal(true); };
-  const openAddExpense = () => { setAddForm({ type: 'EXPENSE', category: 'OTHER', description: '', amount: 0, voucherType: 'NONE', voucherSeries: '', voucherNumber: '', paymentMethodName: 'Efectivo', remisionSerie: '', remisionCorrelativo: '', remisionFecha: '' }); setRucInput(''); setRucFound(''); setShowAddModal(true); };
-  const openEdit = (entry: CashRegisterEntry) => { setSelectedEntry(entry); setEditForm({ amount: entry.amount, reason: '', voucherType: entry.voucherType || 'NONE', voucherSeries: entry.voucherSeries || '', voucherNumber: entry.voucherNumber || '' }); setShowEditModal(true); };
+  const openAddIncome = () => { setAddForm({ type: 'INCOME', category: 'OTHER', description: '', amount: 0, voucherType: 'NONE', voucherSeries: '', voucherNumber: '', paymentMethodId: '', remisionSerie: '', remisionCorrelativo: '', remisionFecha: '' }); setShowAddModal(true); };
+  const openAddExpense = () => { setAddForm({ type: 'EXPENSE', category: 'OPERATING_EXPENSE', description: '', amount: 0, voucherType: 'NONE', voucherSeries: '', voucherNumber: '', paymentMethodId: paymentMethods.find(pm => cashMethodKey(pm.name) === 'efectivo' && pm.isActive)?.id || '', remisionSerie: '', remisionCorrelativo: '', remisionFecha: '' }); setRucInput(''); setRucFound(''); setShowAddModal(true); };
+  const openEdit = (entry: CashRegisterEntry) => { setSelectedEntry(entry); setEditForm({ amount: entry.amount, reason: '', paymentMethodId: entry.paymentMethodId || '', voucherType: entry.voucherType || 'NONE', voucherSeries: entry.voucherSeries || '', voucherNumber: entry.voucherNumber || '' }); setShowEditModal(true); };
   const openDelete = (entry: CashRegisterEntry) => { setSelectedEntry(entry); setDeleteReason(''); setShowDeleteModal(true); };
 
   const handleRucLookup = async () => {
@@ -74,18 +80,15 @@ export function CashRegisterPage() {
   const handleOpen = async (e: React.FormEvent) => { e.preventDefault(); await openCashRegister.mutateAsync({ openingBalance: openingAmount }); };
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    const desc = addForm.paymentMethodName ? `${addForm.description} [${addForm.paymentMethodName}]` : addForm.description;
-    const { paymentMethodName, remisionSerie, remisionCorrelativo, remisionFecha, ...rest } = addForm;
+    const { remisionSerie, remisionCorrelativo, remisionFecha, ...rest } = addForm;
     const hasRemision = addForm.type === 'EXPENSE' && addForm.voucherType === 'FACTURA' && remisionSerie && remisionCorrelativo && remisionFecha;
-    await addEntry.mutateAsync({ registerId: register.id, data: { ...rest, description: desc, ...(hasRemision ? { remisionGuia: { serie: remisionSerie, correlativo: remisionCorrelativo, fecha: remisionFecha } } : {}) } });
+    await addEntry.mutateAsync({ registerId: register.id, data: { ...rest, description: rest.description.trim(), ...(hasRemision ? { remisionGuia: { serie: remisionSerie, correlativo: remisionCorrelativo, fecha: remisionFecha } } : {}) } });
     setShowAddModal(false);
   };
-  const handleEdit = async (e: React.FormEvent) => { e.preventDefault(); await editEntry.mutateAsync({ registerId: register.id, entryId: selectedEntry!.id, data: editForm }); setShowEditModal(false); };
+  const handleEdit = async (e: React.FormEvent) => { e.preventDefault(); await editEntry.mutateAsync({ registerId: register.id, entryId: selectedEntry!.id, data: { ...editForm, paymentMethodId: editForm.paymentMethodId || undefined } }); setShowEditModal(false); };
   const handleDelete = async (e: React.FormEvent) => { e.preventDefault(); await deleteEntryMutation.mutateAsync({ registerId: register.id, entryId: selectedEntry!.id, data: { reason: deleteReason } }); setShowDeleteModal(false); };
-  const handleClose = async () => { await closeRegister.mutateAsync({ registerId: register.id, data: { notes: closeNotes } }); setShowCloseModal(false); };
-
-  const categoryLabels: Record<string, string> = { SALE: 'Venta', CREDIT_PAYMENT: 'Pago Crédito', PURCHASE: 'Compra', ADJUSTMENT: 'Ajuste', OTHER: 'Otro' };
-  const groupedRows = useMemo(() => groupEntries([...entries].reverse()), [entries]);
+  const categoryLabels = cashCategoryLabels;
+  const groupedRows = useMemo(() => groupEntries([...filteredEntries].reverse()), [entries, filters]);
 
   // ── Entry row ──────────────────────────────────────────────────────────────
   const renderEntryRow = (entry: CashRegisterEntry, nested: boolean, key: React.Key) => (
@@ -100,7 +103,7 @@ export function CashRegisterPage() {
         </span>
         {entry.createdAt && (
           <div className="text-[10px] text-gray-400 mt-1 font-mono">
-            {new Date(entry.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+            {new Date(entry.createdAt).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' })}
           </div>
         )}
       </td>
@@ -112,6 +115,7 @@ export function CashRegisterPage() {
       <td className="px-4 py-3">
         <div className="text-sm text-gray-700 leading-snug">
           {entry.description.replace(/\s*\[.*?\]\s*$/, '')}
+          {entry.referenceId && <div className="mt-1 text-xs text-gray-500">Referencia: <span className="font-mono" title={entry.referenceId}>{entry.referenceId.slice(-8)}</span> · <Link className="font-semibold text-primary-700 hover:underline" to={entry.referenceType === 'Sale' ? '/sales' : '/credits'}>{entry.referenceType === 'Sale' ? 'Ver ventas' : 'Ver créditos'}</Link></div>}
         </div>
         {entry.isDeleted && <div className="text-xs text-red-500 mt-0.5 font-medium">✕ Anulado: {entry.deleteReason}</div>}
         {!entry.isDeleted && entry.editHistory?.length > 0 && (
@@ -120,10 +124,10 @@ export function CashRegisterPage() {
       </td>
       <td className="px-4 py-3">
         {(() => {
-          const match = entry.description.match(/\[(.+?)\]$/);
-          return match
-            ? <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{match[1]}</span>
-            : <span className="text-gray-300 text-xs">—</span>;
+          const method = entryPaymentMethod(entry);
+          return method
+            ? <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{method}</span>
+            : <span className="text-amber-700 text-xs">Sin identificar</span>;
         })()}
       </td>
       <td className={`px-4 py-3 text-right font-bold ${entry.type === 'INCOME' ? 'text-primary-700' : 'text-red-600'}`}>
@@ -156,8 +160,8 @@ export function CashRegisterPage() {
                 className="p-1.5 text-blue-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
                 <Edit2 size={13} />
               </button>
-              <button onClick={() => openDelete(entry)} title="Anular"
-                className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+              <button disabled={!!entry.referenceId} onClick={() => openDelete(entry)} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'}
+                className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 rounded-lg transition-colors">
                 <Trash2 size={13} />
               </button>
             </div>
@@ -185,7 +189,7 @@ export function CashRegisterPage() {
           </span>
           {entry.createdAt && (
             <span className="text-[10px] text-gray-400 font-mono">
-              {new Date(entry.createdAt).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+              {new Date(entry.createdAt).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
         </div>
@@ -197,6 +201,7 @@ export function CashRegisterPage() {
       {/* Descripción */}
       <div className="text-sm text-gray-700 leading-snug mb-2">
         {entry.description.replace(/\s*\[.*?\]\s*$/, '')}
+          {entry.referenceId && <div className="mt-1 text-xs text-gray-500">Referencia: <span className="font-mono" title={entry.referenceId}>{entry.referenceId.slice(-8)}</span> · <Link className="font-semibold text-primary-700 hover:underline" to={entry.referenceType === 'Sale' ? '/sales' : '/credits'}>{entry.referenceType === 'Sale' ? 'Ver ventas' : 'Ver créditos'}</Link></div>}
         {entry.isDeleted && <span className="text-xs text-red-500 ml-1.5 font-medium">✕ {entry.deleteReason}</span>}
         {!entry.isDeleted && entry.editHistory?.length > 0 && (
           <span className="text-[10px] text-blue-500 ml-1.5">Editado {entry.editHistory.length}×</span>
@@ -205,7 +210,7 @@ export function CashRegisterPage() {
       {/* Método + comprobante + acciones */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {(() => { const m = entry.description.match(/\[(.+?)\]$/); return m ? <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{m[1]}</span> : null; })()}
+          {(() => { const method = entryPaymentMethod(entry); return method ? <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{method}</span> : null; })()}
           {entry.voucherType === 'BOLETA' && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary-100 text-primary-700">
               Boleta{entry.voucherSeries && entry.voucherNumber ? ` ${entry.voucherSeries}-${entry.voucherNumber}` : ''}
@@ -230,8 +235,8 @@ export function CashRegisterPage() {
               className="p-2 text-blue-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
               <Edit2 size={14} />
             </button>
-            <button onClick={() => openDelete(entry)}
-              className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+            <button disabled={!!entry.referenceId} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'} onClick={() => openDelete(entry)}
+              className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 rounded-lg transition-colors">
               <Trash2 size={14} />
             </button>
           </div>
@@ -246,6 +251,8 @@ export function CashRegisterPage() {
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" />
     </div>
   );
+
+  if (isError) return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-900">No se pudo cargar Caja. <button onClick={() => void refetch()} className="font-bold underline">Volver a intentar</button></div>;
 
   // ── Sin caja ───────────────────────────────────────────────────────────────
   if (!register) {
@@ -317,7 +324,7 @@ export function CashRegisterPage() {
                 className="flex items-center justify-center gap-2 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-semibold shadow-sm shadow-amber-200 active:scale-[0.97] transition-all">
                 <SlidersHorizontal size={15} /> Ajuste
               </button>
-              <button onClick={() => { setCloseNotes(''); setShowCloseModal(true); }}
+              <button onClick={() => { setCloseTarget(register); setShowCloseModal(true); }}
                 className="flex items-center justify-center gap-2 py-2.5 bg-gray-700 text-white rounded-xl text-sm font-semibold active:scale-[0.97] transition-all">
                 <Lock size={15} /> Cerrar Caja
               </button>
@@ -336,7 +343,7 @@ export function CashRegisterPage() {
                 className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 text-sm font-semibold shadow-sm shadow-amber-200 transition-colors">
                 <SlidersHorizontal size={15} /> Ajuste
               </button>
-              <button onClick={() => { setCloseNotes(''); setShowCloseModal(true); }}
+              <button onClick={() => { setCloseTarget(register); setShowCloseModal(true); }}
                 className="flex items-center gap-1.5 px-4 py-2 bg-gray-700 text-white rounded-xl hover:bg-gray-800 text-sm font-semibold transition-colors">
                 <Lock size={15} /> Cerrar Caja
               </button>
@@ -356,44 +363,22 @@ export function CashRegisterPage() {
         </Link>
       </div>
 
-      {/* Stats cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Apertura</p>
-            <div className="p-1.5 bg-gray-100 rounded-lg"><Wallet size={13} className="text-gray-500" /></div>
-          </div>
-          <p className="text-xl font-bold text-gray-800">S/ {(register?.openingBalance || 0).toFixed(2)}</p>
-          <p className="text-[11px] text-gray-400 mt-1">Saldo inicial</p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+        <span>Actualizado: {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('es-PE', { timeZone: 'America/Lima' }) : '—'} · Se actualiza automáticamente</span>
+        <button onClick={() => void refetch()} disabled={isFetching} className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-50"><RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} /> Actualizar</button>
+      </div>
+      <CashOverview register={register} />
+      <div className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <label className="text-xs font-semibold text-gray-600">Buscar movimiento<input value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} placeholder="Producto, descripción, referencia…" className="mt-1 w-full rounded-lg border border-gray-200 p-2 text-sm font-normal" /></label>
+          <label className="text-xs font-semibold text-gray-600">Tipo<select value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-200 p-2 text-sm font-normal"><option value="">Ingresos y egresos</option><option value="INCOME">Ingresos</option><option value="EXPENSE">Egresos</option></select></label>
+          <label className="text-xs font-semibold text-gray-600">Origen / categoría<select value={filters.category} onChange={e => setFilters({ ...filters, category: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-200 p-2 text-sm font-normal"><option value="">Todos</option>{Object.entries(categoryLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+          <label className="text-xs font-semibold text-gray-600">Método de pago<select value={filters.method} onChange={e => setFilters({ ...filters, method: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-200 p-2 text-sm font-normal"><option value="">Todos</option>{summary.methods.map(method => <option key={method.key} value={method.key || '__unknown'}>{method.name}</option>)}</select></label>
         </div>
-
-        <div className="bg-white rounded-xl border border-primary-100 shadow-sm px-5 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-semibold text-primary-500 uppercase tracking-wide">Ingresos</p>
-            <div className="p-1.5 bg-primary-50 rounded-lg"><TrendingUp size={13} className="text-primary-500" /></div>
-          </div>
-          <p className="text-xl font-bold text-primary-700">+ S/ {totalIncome.toFixed(2)}</p>
-          <p className="text-[11px] text-gray-400 mt-1">{activeEntries.filter(e => e.type === 'INCOME').length} movimiento{activeEntries.filter(e => e.type === 'INCOME').length !== 1 ? 's' : ''}</p>
-        </div>
-
-        <div className="bg-white rounded-xl border border-red-100 shadow-sm px-5 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[11px] font-semibold text-red-400 uppercase tracking-wide">Egresos</p>
-            <div className="p-1.5 bg-red-50 rounded-lg"><TrendingDown size={13} className="text-red-400" /></div>
-          </div>
-          <p className="text-xl font-bold text-red-600">− S/ {totalExpense.toFixed(2)}</p>
-          <p className="text-[11px] text-gray-400 mt-1">{activeEntries.filter(e => e.type === 'EXPENSE').length} movimiento{activeEntries.filter(e => e.type === 'EXPENSE').length !== 1 ? 's' : ''}</p>
-        </div>
-
-        <div className={`bg-white rounded-xl shadow-sm px-5 py-4 border ${netBalance >= 0 ? 'border-blue-100' : 'border-red-200'}`}>
-          <div className="flex items-center justify-between mb-3">
-            <p className={`text-[11px] font-semibold uppercase tracking-wide ${netBalance >= 0 ? 'text-blue-400' : 'text-red-400'}`}>Balance Neto</p>
-            <div className={`p-1.5 rounded-lg ${netBalance >= 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
-              <ArrowRightLeft size={13} className={netBalance >= 0 ? 'text-blue-500' : 'text-red-500'} />
-            </div>
-          </div>
-          <p className={`text-xl font-bold ${netBalance >= 0 ? 'text-blue-700' : 'text-red-700'}`}>S/ {netBalance.toFixed(2)}</p>
-          <p className="text-[11px] text-gray-400 mt-1">Apertura + ingresos − egresos</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={filters.showDeleted} onChange={e => setFilters({ ...filters, showDeleted: e.target.checked })} /> Mostrar anulados</label>
+          <span className="text-xs text-gray-500">{filteredEntries.length} de {entries.length} movimientos · El resumen superior incluye todos los activos.</span>
+          <button onClick={() => downloadMovements(filteredEntries, register.date)} disabled={!filteredEntries.length} className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-50"><Download size={15} /> Exportar CSV</button>
         </div>
       </div>
 
@@ -415,10 +400,10 @@ export function CashRegisterPage() {
 
         {/* ── Mobile: tarjetas ───────────────────────────────────────────── */}
         <div className="lg:hidden divide-y divide-gray-100">
-          {entries.length === 0 ? (
+          {filteredEntries.length === 0 ? (
             <div className="px-4 py-16 text-center">
               <Receipt size={36} className="mx-auto mb-2 text-gray-200" />
-              <p className="text-sm text-gray-400">No hay movimientos registrados</p>
+              <p className="text-sm text-gray-400">No hay movimientos que coincidan</p>
               {!isClosed && (
                 <div className="flex items-center justify-center gap-2 mt-3">
                   <button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button>
@@ -545,7 +530,7 @@ export function CashRegisterPage() {
                 <tr>
                   <td colSpan={isClosed ? 6 : 7} className="px-4 py-16 text-center">
                     <Receipt size={36} className="mx-auto mb-2 text-gray-200" />
-                    <p className="text-sm text-gray-400">No hay movimientos registrados</p>
+                    <p className="text-sm text-gray-400">No hay movimientos que coincidan</p>
                     {!isClosed && (
                       <div className="flex items-center justify-center gap-2 mt-3">
                         <button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button>
@@ -567,6 +552,12 @@ export function CashRegisterPage() {
         <form onSubmit={handleAdd} className="space-y-4">
           <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold ${addForm.type === 'INCOME' ? 'bg-primary-50 text-primary-700 border border-primary-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
             {addForm.type === 'INCOME' ? <><TrendingUp size={15} /> Registrando un ingreso</> : <><TrendingDown size={15} /> Registrando un egreso</>}
+          </div>
+          <div><label className="mb-1 block text-sm font-medium text-gray-700">Motivo del movimiento</label>
+            <select value={addForm.category} onChange={e => setAddForm({ ...addForm, category: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              {(addForm.type === 'INCOME' ? ['OTHER', 'CAPITAL_CONTRIBUTION'] : ['OPERATING_EXPENSE', 'WITHDRAWAL', 'PURCHASE', 'OTHER']).map(category => <option key={category} value={category}>{categoryLabels[category]}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">Registra las ventas en POS y los abonos en Créditos para mantener sus saldos vinculados.</p>
           </div>
           {addForm.type === 'EXPENSE' && (
             <div>
@@ -618,14 +609,14 @@ export function CashRegisterPage() {
                 <input type="date" value={addForm.remisionFecha} onChange={e => setAddForm({ ...addForm, remisionFecha: e.target.value })} className="w-full px-3 py-2 border border-amber-200 rounded-lg text-sm bg-white" /></div>
             </div>
           )}
-          {addForm.type === 'INCOME' && (
+          {(
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pago</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Método de pago (obligatorio)</label>
               {paymentMethods.length === 0 ? <p className="text-sm text-gray-400">Cargando...</p> : (
                 <div className="flex flex-wrap gap-2">
-                  {paymentMethods.map((pm: { id: string; name: string }) => (
-                    <button key={pm.id} type="button" onClick={() => setAddForm({ ...addForm, paymentMethodName: pm.name })}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${addForm.paymentMethodName === pm.name ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-300 hover:border-primary-400'}`}>
+                  {paymentMethods.filter(pm => pm.isActive).map((pm: { id: string; name: string }) => (
+                    <button key={pm.id} type="button" onClick={() => setAddForm({ ...addForm, paymentMethodId: pm.id })}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${addForm.paymentMethodId === pm.id ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-600 border-gray-300 hover:border-primary-400'}`}>
                       {pm.name}
                     </button>
                   ))}
@@ -633,11 +624,11 @@ export function CashRegisterPage() {
               )}
             </div>
           )}
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-            <input value={addForm.description} onChange={e => setAddForm({ ...addForm, description: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required /></div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Monto (S/)</label>
-            <input type="number" min="0.01" step="0.01" value={addForm.amount || ''} onChange={e => setAddForm({ ...addForm, amount: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required /></div>
-          <button type="submit" disabled={addEntry.isPending}
+          <div><label htmlFor="cash-entry-description" className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+            <input id="cash-entry-description" value={addForm.description} onChange={e => setAddForm({ ...addForm, description: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required /></div>
+          <div><label htmlFor="cash-entry-amount" className="block text-sm font-medium text-gray-700 mb-1">Monto (S/)</label>
+            <input id="cash-entry-amount" type="number" min="0.01" step="0.01" value={addForm.amount || ''} onChange={e => setAddForm({ ...addForm, amount: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required /></div>
+          <button type="submit" disabled={addEntry.isPending || !addForm.paymentMethodId || !addForm.description.trim()}
             className={`w-full py-2.5 text-white rounded-xl font-semibold disabled:opacity-50 transition-colors ${addForm.type === 'INCOME' ? 'bg-primary-600 hover:bg-primary-700' : 'bg-red-500 hover:bg-red-600'}`}>
             {addEntry.isPending ? 'Registrando...' : addForm.type === 'INCOME' ? 'Registrar Ingreso' : 'Registrar Egreso'}
           </button>
@@ -650,7 +641,7 @@ export function CashRegisterPage() {
             Monto actual: <span className="font-bold text-gray-800">S/ {selectedEntry?.amount.toFixed(2)}</span>
           </div>
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Nuevo monto (S/)</label>
-            <input type="number" min="0.01" step="0.01" value={editForm.amount || ''} onChange={e => setEditForm({ ...editForm, amount: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required /></div>
+            <input type="number" disabled={!!selectedEntry?.referenceId} min="0.01" step="0.01" value={editForm.amount || ''} onChange={e => setEditForm({ ...editForm, amount: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required /></div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Comprobante</label>
             <div className="flex gap-2">
@@ -672,8 +663,12 @@ export function CashRegisterPage() {
                 <input value={editForm.voucherNumber} onChange={e => setEditForm({ ...editForm, voucherNumber: e.target.value.replace(/\D/g, '').slice(0, 8) })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="00000001" /></div>
             </div>
           )}
+          <div><label className="mb-1 block text-sm font-medium text-gray-700">Método de pago</label>
+            {selectedEntry?.referenceId && entryPaymentMethod(selectedEntry) ? <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">{entryPaymentMethod(selectedEntry)} · Vinculado a la operación original</p> : <select value={editForm.paymentMethodId} onChange={e => setEditForm({ ...editForm, paymentMethodId: e.target.value })} className="w-full rounded-lg border border-gray-200 p-2 text-sm"><option value="">{selectedEntry ? entryPaymentMethod(selectedEntry) || 'Seleccionar método' : 'Seleccionar método'}</option>{paymentMethods.filter(pm => pm.isActive).map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}</select>}
+            {!!selectedEntry?.referenceId && <p className="mt-1 text-xs text-gray-500">El importe se conserva porque pertenece a una venta o abono.</p>}
+          </div>
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Razón del cambio <span className="text-red-500">*</span></label>
-            <textarea value={editForm.reason} onChange={e => setEditForm({ ...editForm, reason: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" rows={2} required /></div>
+            <textarea minLength={5} value={editForm.reason} onChange={e => setEditForm({ ...editForm, reason: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" rows={2} required /></div>
           <button type="submit" disabled={editEntry.isPending} className="w-full py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 font-semibold transition-colors">
             {editEntry.isPending ? 'Guardando...' : 'Guardar cambio'}
           </button>
@@ -720,69 +715,8 @@ export function CashRegisterPage() {
         </form>
       </Modal>
 
-      <Modal isOpen={showCloseModal} onClose={() => setShowCloseModal(false)} title="Cerrar Caja">
-        {(() => {
-          const methodBreakdown: Record<string, { income: number; expense: number }> = {};
-          activeEntries.forEach(entry => {
-            const match = entry.description.match(/\[(.+?)\]$/);
-            const method = match ? match[1] : 'Sin método';
-            if (!methodBreakdown[method]) methodBreakdown[method] = { income: 0, expense: 0 };
-            if (entry.type === 'INCOME') methodBreakdown[method].income += entry.amount;
-            else methodBreakdown[method].expense += entry.amount;
-          });
-          const methods = Object.entries(methodBreakdown).sort((a, b) => (b[1].income + b[1].expense) - (a[1].income + a[1].expense));
-
-          return (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-500">Al cerrar la caja no se podrán agregar, editar ni anular movimientos.</p>
-
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-1.5 text-sm">
-                <div className="flex justify-between text-gray-600"><span>Balance apertura</span><span className="font-medium">S/ {(register?.openingBalance || 0).toFixed(2)}</span></div>
-                <div className="flex justify-between text-primary-600"><span>+ Total ingresos</span><span className="font-semibold">S/ {totalIncome.toFixed(2)}</span></div>
-                <div className="flex justify-between text-red-600"><span>− Total egresos</span><span className="font-semibold">S/ {totalExpense.toFixed(2)}</span></div>
-                <div className="flex justify-between font-bold text-gray-800 pt-2 mt-1 border-t border-gray-200">
-                  <span>Balance de cierre</span><span>S/ {netBalance.toFixed(2)}</span>
-                </div>
-              </div>
-
-              {methods.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Desglose por método de pago</label>
-                  <div className="border border-gray-200 rounded-xl overflow-hidden">
-                    <table className="min-w-full divide-y divide-gray-100 text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Método</th>
-                          <th className="px-3 py-2 text-right text-[11px] font-semibold text-primary-500 uppercase tracking-wide">Ingresos</th>
-                          <th className="px-3 py-2 text-right text-[11px] font-semibold text-red-400 uppercase tracking-wide">Egresos</th>
-                          <th className="px-3 py-2 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Neto</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {methods.map(([method, totals]) => (
-                          <tr key={method}>
-                            <td className="px-3 py-2 font-medium text-gray-700">{method}</td>
-                            <td className="px-3 py-2 text-right text-primary-600 font-medium">{totals.income > 0 ? `S/ ${totals.income.toFixed(2)}` : <span className="text-gray-300">—</span>}</td>
-                            <td className="px-3 py-2 text-right text-red-600 font-medium">{totals.expense > 0 ? `S/ ${totals.expense.toFixed(2)}` : <span className="text-gray-300">—</span>}</td>
-                            <td className="px-3 py-2 text-right font-bold text-gray-800">S/ {(totals.income - totals.expense).toFixed(2)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Notas <span className="text-gray-400 font-normal">(opcional)</span></label>
-                <textarea value={closeNotes} onChange={e => setCloseNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" rows={2} /></div>
-              <button onClick={handleClose} disabled={closeRegister.isPending}
-                className="w-full py-2.5 bg-gray-800 text-white rounded-xl hover:bg-gray-900 disabled:opacity-50 font-semibold transition-colors flex items-center justify-center gap-2">
-                <Lock size={15} />
-                {closeRegister.isPending ? 'Cerrando...' : 'Confirmar cierre'}
-              </button>
-            </div>
-          );
-        })()}
+      <Modal isOpen={showCloseModal} onClose={() => setShowCloseModal(false)} title="Cerrar caja con arqueo">
+        {closeTarget && <CashCloseForm register={closeTarget} pending={closeRegister.isPending} onSubmit={async data => { await closeRegister.mutateAsync({ registerId: closeTarget.id, data }); setShowCloseModal(false); }} />}
       </Modal>
     </div>
   );
