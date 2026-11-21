@@ -655,7 +655,7 @@ export function ProductsPage() {
         {canManageProducts && activeTab === 'active' && <button onClick={() => openEdit(item)} className="text-blue-600 hover:text-blue-800" title="Editar"><Edit2 size={16} /></button>}
         {canManageProducts && (activeTab === 'active'
           ? <button onClick={() => setDeleteTarget(item)} className="text-red-600 hover:text-red-800" title="Desactivar"><Trash2 size={16} /></button>
-          : <button onClick={() => updateProduct.mutateAsync({ id: item.id, data: { isActive: true } })} className="text-green-600 hover:text-green-800 text-xs font-medium px-2 py-1 border border-green-300 rounded-lg" title="Reactivar">Reactivar</button>
+          : item.catalogImport?.deduplication?.inventoryConsolidated ? <span className="text-xs font-medium text-gray-600">Consolidado en {item.catalogImport.deduplication.canonicalSku}</span> : <button onClick={() => updateProduct.mutateAsync({ id: item.id, data: { isActive: true } })} className="text-green-600 hover:text-green-800 text-xs font-medium px-2 py-1 border border-green-300 rounded-lg" title="Reactivar">Reactivar</button>
         )}
       </div>
     )},
@@ -859,7 +859,7 @@ export function ProductsPage() {
                     <Trash2 size={13} /> Desact.
                   </button>
                 </div>
-              ) : (
+              ) : item.catalogImport?.deduplication?.inventoryConsolidated ? <p className="rounded-lg bg-gray-50 p-2 text-xs text-gray-600">Ficha consolidada. Código principal: {item.catalogImport.deduplication.canonicalSku}</p> : (
                 <button onClick={() => updateProduct.mutateAsync({ id: item.id, data: { isActive: true } })} className="w-full flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200">
                   Reactivar producto
                 </button>
