@@ -1,3 +1,4 @@
+import { WriteAccess } from '../../../shared/components/WriteAccess';
 import { useState, useMemo, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { usePurchases, useUpdateRemisionGuia } from '../hooks/usePurchases';
@@ -171,14 +172,14 @@ export function PurchasesPage() {
           <ShoppingCart size={24} /> Compras / Ingresos
         </h1>
         <div className="flex items-center gap-2">
-          <Link to="/purchases/new?historical=true"
+          <WriteAccess><Link to="/purchases/new?historical=true"
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium transition-colors">
             <Archive size={16} /> Factura Antigua
-          </Link>
-          <Link to="/purchases/new"
+          </Link></WriteAccess>
+          <WriteAccess><Link to="/purchases/new"
             className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium transition-colors">
             <Plus size={18} /> Nueva Compra
-          </Link>
+          </Link></WriteAccess>
         </div>
       </div>
 
@@ -402,12 +403,12 @@ export function PurchasesPage() {
                                   <Eye size={12} /> Ver
                                 </button>
                               )}
-                              <button
+                              <WriteAccess><button
                                 onClick={e => openRemisionModal(e, purchase)}
                                 className={`flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${purchase.remisionGuia ? 'text-amber-700 bg-amber-50 hover:bg-amber-100' : 'text-gray-400 bg-gray-50 hover:bg-amber-50 hover:text-amber-600'}`}>
                                 <FileText size={12} />
                                 {purchase.remisionGuia ? `${purchase.remisionGuia.serie}-${purchase.remisionGuia.correlativo}` : 'G.R.'}
-                              </button>
+                              </button></WriteAccess>
                             </div>
                           </div>
                         </div>
@@ -493,10 +494,10 @@ export function PurchasesPage() {
                                     <Eye size={13} /> Ver
                                   </button>
                                 )}
-                                <button onClick={e => openRemisionModal(e, purchase)} title={purchase.remisionGuia ? `G.R. ${purchase.remisionGuia.serie}-${purchase.remisionGuia.correlativo}` : 'Agregar guía de remisión'} className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-colors whitespace-nowrap ${purchase.remisionGuia ? 'text-amber-700 bg-amber-50 hover:bg-amber-100' : 'text-gray-400 hover:text-amber-600 bg-gray-50 hover:bg-amber-50'}`}>
+                                <WriteAccess><button onClick={e => openRemisionModal(e, purchase)} title={purchase.remisionGuia ? `G.R. ${purchase.remisionGuia.serie}-${purchase.remisionGuia.correlativo}` : 'Agregar guía de remisión'} className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded transition-colors whitespace-nowrap ${purchase.remisionGuia ? 'text-amber-700 bg-amber-50 hover:bg-amber-100' : 'text-gray-400 hover:text-amber-600 bg-gray-50 hover:bg-amber-50'}`}>
                                   <FileText size={13} />
                                   {purchase.remisionGuia ? `${purchase.remisionGuia.serie}-${purchase.remisionGuia.correlativo}` : 'G.R.'}
-                                </button>
+                                </button></WriteAccess>
                               </div>
                             </td>
                           </tr>

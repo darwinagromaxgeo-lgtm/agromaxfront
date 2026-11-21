@@ -1,3 +1,4 @@
+import { WriteAccess } from '../../../shared/components/WriteAccess';
 import React, { useState, useRef } from 'react';
 import { useStock, useStockAlerts, useTransferStock } from '../hooks/useStock';
 import { useStockAdjustments, useCreateStockAdjustment } from '../hooks/useStockAdjustments';
@@ -343,19 +344,19 @@ export function StockPage() {
           </p>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 scrollbar-hide">
-          <button
+          <WriteAccess><button
             onClick={() => { setImportCompanyId(companyId); setImportRows([]); setShowImportModal(true); }}
             className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
             <FileSpreadsheet size={15} /> Importar
-          </button>
+          </button></WriteAccess>
           {activeTab === 'inventory' && (
             <>
-              <button onClick={() => setShowCount(true)} className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
+              <WriteAccess><button onClick={() => setShowCount(true)} className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
                 <ClipboardList size={15} /> Conteo de stock
-              </button>
-              <button onClick={openTransfer} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
+              </button></WriteAccess>
+              <WriteAccess><button onClick={openTransfer} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
                 <ArrowRightLeft size={15} /> Transferir
-              </button>
+              </button></WriteAccess>
             </>
           )}
         </div>
@@ -454,10 +455,10 @@ export function StockPage() {
                     <div className="text-[10px] font-bold text-red-700 uppercase tracking-widest mb-2">Agotados ({outOfStock.length})</div>
                     <div className="flex flex-wrap gap-1.5">
                       {outOfStock.map((a) => (
-                        <button key={`${a.productId}-${a.companyId}`} onClick={() => openAdjustment({ productId: a.productId, companyId: a.companyId })}
+                        <WriteAccess key={`${a.productId}-${a.companyId}`}><button key={`${a.productId}-${a.companyId}`} onClick={() => openAdjustment({ productId: a.productId, companyId: a.companyId })}
                           className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg text-xs font-medium border border-red-200 transition-colors" title="Click para ajustar stock">
                           {a._name}
-                        </button>
+                        </button></WriteAccess>
                       ))}
                     </div>
                   </div>
@@ -467,10 +468,10 @@ export function StockPage() {
                     <div className="text-[10px] font-bold text-orange-700 uppercase tracking-widest mb-2">Crítico ({critical.length})</div>
                     <div className="flex flex-wrap gap-1.5">
                       {visibleCritical.map((a) => (
-                        <button key={`${a.productId}-${a.companyId}`} onClick={() => openAdjustment({ productId: a.productId, companyId: a.companyId })}
+                        <WriteAccess key={`${a.productId}-${a.companyId}`}><button key={`${a.productId}-${a.companyId}`} onClick={() => openAdjustment({ productId: a.productId, companyId: a.companyId })}
                           className="px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-orange-900 rounded-lg text-xs font-medium border border-orange-200 transition-colors" title="Click para ajustar stock">
                           {a._name} <span className="font-bold ml-1">{a.quantity}</span>
-                        </button>
+                        </button></WriteAccess>
                       ))}
                       {!showAllLowStock && hiddenCount > 0 && (
                         <button onClick={() => setShowAllLowStock(true)} className="px-2.5 py-1 bg-white hover:bg-gray-50 text-gray-600 rounded-lg text-xs font-medium border border-gray-200">
@@ -628,7 +629,7 @@ export function StockPage() {
                 <div key={item.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0">
-                      <button type="button" onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId || companyId })} className="font-medium text-gray-800 text-sm leading-snug text-left hover:text-orange-600 hover:underline">{getProductName(item.productId)}</button>
+                      <WriteAccess fallback={<span className="font-medium text-gray-800">{getProductName(item.productId)}</span>}><button type="button" onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId || companyId })} className="font-medium text-gray-800 text-sm leading-snug text-left hover:text-orange-600 hover:underline">{getProductName(item.productId)}</button></WriteAccess>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         {product?.tracksLot && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-semibold">LOTES</span>}
                         {location && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-700 border border-purple-200 font-semibold">{location}</span>}
@@ -644,10 +645,10 @@ export function StockPage() {
                         {isExpanded ? <><ChevronUp size={12} /> Ocultar lotes</> : <><ChevronDown size={12} /> Ver lotes</>}
                       </button>
                     ) : <div />}
-                    <button onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId })}
+                    <WriteAccess><button onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId })}
                       className="px-2.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg text-xs font-medium border border-orange-200 transition-colors">
                       Movimiento
-                    </button>
+                    </button></WriteAccess>
                   </div>
                   {hasLots && isExpanded && (
                     <div className="mt-2 pt-2 border-t border-gray-100 space-y-1.5">
@@ -697,11 +698,11 @@ export function StockPage() {
                     <React.Fragment key={item.id}>
                       <tr className="hover:bg-primary-50/40 transition-colors">
                         <td className="px-2">{hasLots && (<button onClick={() => setExpandedStock(s => ({ ...s, [item.id]: !s[item.id] }))} className="p-1.5 text-gray-300 hover:text-primary-500 rounded transition-colors">{isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>)}</td>
-                        <td className="px-4 py-3"><div className="flex items-center gap-2 flex-wrap"><button type="button" onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId || companyId })} className="font-medium text-gray-800 text-left hover:text-orange-600 hover:underline">{getProductName(item.productId)}</button>{product?.tracksLot && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-semibold">LOTES</span>}{getProductLocation(item.productId) && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-700 border border-purple-200 font-semibold">{getProductLocation(item.productId)}</span>}</div></td>
+                        <td className="px-4 py-3"><div className="flex items-center gap-2 flex-wrap"><WriteAccess fallback={<span className="font-medium text-gray-800">{getProductName(item.productId)}</span>}><button type="button" onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId || companyId })} className="font-medium text-gray-800 text-left hover:text-orange-600 hover:underline">{getProductName(item.productId)}</button></WriteAccess>{product?.tracksLot && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-semibold">LOTES</span>}{getProductLocation(item.productId) && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-700 border border-purple-200 font-semibold">{getProductLocation(item.productId)}</span>}</div></td>
                         <td className="px-4 py-3 text-gray-400 text-xs">{getProductUnit(item.productId)}</td>
                         <td className="px-4 py-3">{qtyBadge(item.quantity)}</td>
                         <td className="px-4 py-3 text-gray-400 text-xs">{item.lastUpdated && !isNaN(new Date(item.lastUpdated).getTime()) ? new Date(item.lastUpdated).toLocaleDateString('es-PE') : '—'}</td>
-                        <td className="px-4 py-3 text-right"><button onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId })} className="px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg text-xs font-medium border border-orange-200 transition-colors">Movimiento</button></td>
+                        <td className="px-4 py-3 text-right"><WriteAccess><button onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId })} className="px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg text-xs font-medium border border-orange-200 transition-colors">Movimiento</button></WriteAccess></td>
                       </tr>
                       {hasLots && isExpanded && (
                         <tr className="bg-blue-50/30"><td></td><td colSpan={5} className="px-4 py-3">
@@ -796,9 +797,9 @@ export function StockPage() {
       {activeTab === 'adjustments' && (
         <>
           <div className="flex justify-end mb-3">
-            <button onClick={() => openAdjustment()} className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium shadow-sm transition-colors">
+            <WriteAccess><button onClick={() => openAdjustment()} className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium shadow-sm transition-colors">
               <Plus size={16} /> Nuevo movimiento
-            </button>
+            </button></WriteAccess>
           </div>
           {/* Mobile cards */}
           <div className="lg:hidden space-y-2">
@@ -810,7 +811,7 @@ export function StockPage() {
               <div key={item.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                 <div className="flex items-start justify-between gap-2 mb-1.5">
                   <div className="min-w-0">
-                    <button type="button" onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId || companyId })} className="font-medium text-gray-800 text-sm leading-snug text-left hover:text-orange-600 hover:underline">{getProductName(item.productId)}</button>
+                    <WriteAccess fallback={<span className="font-medium text-gray-800">{getProductName(item.productId)}</span>}><button type="button" onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId || companyId })} className="font-medium text-gray-800 text-sm leading-snug text-left hover:text-orange-600 hover:underline">{getProductName(item.productId)}</button></WriteAccess>
                     <div className="text-xs text-gray-400 mt-0.5">{new Date(item.date).toLocaleDateString('es-PE')} · {getCompanyName(item.companyId)}</div>
                   </div>
                   <AdjustmentBadge adjustment={item} />
@@ -871,11 +872,11 @@ export function StockPage() {
           <p className="text-gray-500 text-sm max-w-sm mx-auto mb-6">
             Mueve productos entre empresas manteniendo la trazabilidad de lotes con asignación FIFO automática.
           </p>
-          <button
+          <WriteAccess><button
             onClick={() => { setActiveTab('inventory'); setTimeout(openTransfer, 50); }}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors shadow-sm">
             <ArrowRightLeft size={16} /> Nueva Transferencia
-          </button>
+          </button></WriteAccess>
         </div>
       )}
 

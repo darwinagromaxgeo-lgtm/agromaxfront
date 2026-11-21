@@ -139,6 +139,7 @@ export function UsersPage() {
               <option value="">Todos los roles</option>
               <option value="ADMIN">Admin</option>
               <option value="VENDEDOR">Vendedor</option>
+              <option value="CONTABILIDAD">Contabilidad · consulta y descarga</option>
             </select>
             <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 text-sm">
               <option value="">Todos los estados</option>
@@ -223,6 +224,7 @@ export function UsersPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
             <select value={createForm.role} onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })} className="w-full px-3 py-2 border rounded-lg">
               <option value="VENDEDOR">Vendedor</option>
+              <option value="CONTABILIDAD">Contabilidad · consulta y descarga</option>
               <option value="ALMACENERO">Almacenero</option>
               <option value="ADMIN">Admin</option>
             </select>
@@ -254,6 +256,7 @@ export function UsersPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
             <select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="w-full px-3 py-2 border rounded-lg">
               <option value="VENDEDOR">Vendedor</option>
+              <option value="CONTABILIDAD">Contabilidad · consulta y descarga</option>
               <option value="ADMIN">Admin</option>
             </select>
           </div>

@@ -1,3 +1,4 @@
+import { WriteAccess, useAccountingReadOnly } from '../../../shared/components/WriteAccess';
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCashRegisterToday, useOpenCashRegister, useAddCashEntry, useEditCashEntry, useDeleteCashEntry, useCloseCashRegister, useAdjustOpeningBalance } from '../hooks/useCashRegister';
@@ -14,6 +15,7 @@ import { entryPaymentMethod, cashMethodKey, summarizeCash } from '../utils/cashS
 import { filterCashEntries, downloadMovements } from '../utils/cashMovements';
 
 export function CashRegisterPage() {
+  const readOnly = useAccountingReadOnly();
   const { data: register, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useCashRegisterToday();
   const openCashRegister = useOpenCashRegister();
   const addEntry = useAddCashEntry();
@@ -156,14 +158,14 @@ export function CashRegisterPage() {
         <td className="px-4 py-3">
           {!entry.isDeleted && !nested && (
             <div className="flex gap-1 justify-center">
-              <button onClick={() => openEdit(entry)} title="Editar"
+              <WriteAccess><button onClick={() => openEdit(entry)} title="Editar"
                 className="p-1.5 text-blue-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
                 <Edit2 size={13} />
-              </button>
-              <button disabled={!!entry.referenceId} onClick={() => openDelete(entry)} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'}
+              </button></WriteAccess>
+              <WriteAccess><button disabled={!!entry.referenceId} onClick={() => openDelete(entry)} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'}
                 className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 rounded-lg transition-colors">
                 <Trash2 size={13} />
-              </button>
+              </button></WriteAccess>
             </div>
           )}
         </td>
@@ -231,14 +233,14 @@ export function CashRegisterPage() {
         </div>
         {!isClosed && !entry.isDeleted && !nested && (
           <div className="flex gap-1 flex-shrink-0">
-            <button onClick={() => openEdit(entry)}
+            <WriteAccess><button onClick={() => openEdit(entry)}
               className="p-2 text-blue-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
               <Edit2 size={14} />
-            </button>
-            <button disabled={!!entry.referenceId} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'} onClick={() => openDelete(entry)}
+            </button></WriteAccess>
+            <WriteAccess><button disabled={!!entry.referenceId} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'} onClick={() => openDelete(entry)}
               className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 rounded-lg transition-colors">
               <Trash2 size={14} />
-            </button>
+            </button></WriteAccess>
           </div>
         )}
       </div>
@@ -263,8 +265,8 @@ export function CashRegisterPage() {
             <Wallet size={32} className="text-primary-600" />
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-1">No hay caja abierta</h2>
-          <p className="text-sm text-gray-500 mb-6">Ingresa el monto inicial para abrir la caja del día</p>
-          <form onSubmit={handleOpen} className="space-y-4">
+          <p className="text-sm text-gray-500 mb-6">{readOnly ? 'Consulta las cajas anteriores en el historial.' : 'Ingresa el monto inicial para abrir la caja del día'}</p>
+          <WriteAccess><form onSubmit={handleOpen} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Monto inicial (S/)</label>
               <input
@@ -280,7 +282,7 @@ export function CashRegisterPage() {
               <Wallet size={18} />
               {openCashRegister.isPending ? 'Abriendo...' : 'Abrir Caja'}
             </button>
-          </form>
+          </form></WriteAccess>
           <Link to="/cash-register/history"
             className="inline-flex items-center gap-1.5 mt-5 text-sm text-gray-400 hover:text-gray-600 transition-colors">
             <History size={14} /> Ver historial de cajas
@@ -312,41 +314,41 @@ export function CashRegisterPage() {
           <>
             {/* Mobile: grid 2×2 */}
             <div className="grid grid-cols-2 gap-2 sm:hidden">
-              <button onClick={openAddIncome}
+              <WriteAccess><button onClick={openAddIncome}
                 className="flex items-center justify-center gap-2 py-3.5 bg-primary-600 text-white rounded-xl text-sm font-semibold shadow-sm shadow-primary-200 active:scale-[0.97] transition-all">
                 <TrendingUp size={17} /> Ingreso
-              </button>
-              <button onClick={openAddExpense}
+              </button></WriteAccess>
+              <WriteAccess><button onClick={openAddExpense}
                 className="flex items-center justify-center gap-2 py-3.5 bg-red-500 text-white rounded-xl text-sm font-semibold shadow-sm shadow-red-200 active:scale-[0.97] transition-all">
                 <TrendingDown size={17} /> Egreso
-              </button>
-              <button onClick={() => { setAdjustForm({ openingBalance: register?.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }}
+              </button></WriteAccess>
+              <WriteAccess><button onClick={() => { setAdjustForm({ openingBalance: register?.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }}
                 className="flex items-center justify-center gap-2 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-semibold shadow-sm shadow-amber-200 active:scale-[0.97] transition-all">
                 <SlidersHorizontal size={15} /> Ajuste
-              </button>
-              <button onClick={() => { setCloseTarget(register); setShowCloseModal(true); }}
+              </button></WriteAccess>
+              <WriteAccess><button onClick={() => { setCloseTarget(register); setShowCloseModal(true); }}
                 className="flex items-center justify-center gap-2 py-2.5 bg-gray-700 text-white rounded-xl text-sm font-semibold active:scale-[0.97] transition-all">
                 <Lock size={15} /> Cerrar Caja
-              </button>
+              </button></WriteAccess>
             </div>
             {/* Tablet / Desktop: fila */}
             <div className="hidden sm:flex flex-wrap gap-2">
-              <button onClick={openAddIncome}
+              <WriteAccess><button onClick={openAddIncome}
                 className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 text-sm font-semibold shadow-sm shadow-primary-200 transition-colors">
                 <TrendingUp size={15} /> Ingreso
-              </button>
-              <button onClick={openAddExpense}
+              </button></WriteAccess>
+              <WriteAccess><button onClick={openAddExpense}
                 className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 text-sm font-semibold shadow-sm shadow-red-200 transition-colors">
                 <TrendingDown size={15} /> Egreso
-              </button>
-              <button onClick={() => { setAdjustForm({ openingBalance: register?.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }}
+              </button></WriteAccess>
+              <WriteAccess><button onClick={() => { setAdjustForm({ openingBalance: register?.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }}
                 className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 text-sm font-semibold shadow-sm shadow-amber-200 transition-colors">
                 <SlidersHorizontal size={15} /> Ajuste
-              </button>
-              <button onClick={() => { setCloseTarget(register); setShowCloseModal(true); }}
+              </button></WriteAccess>
+              <WriteAccess><button onClick={() => { setCloseTarget(register); setShowCloseModal(true); }}
                 className="flex items-center gap-1.5 px-4 py-2 bg-gray-700 text-white rounded-xl hover:bg-gray-800 text-sm font-semibold transition-colors">
                 <Lock size={15} /> Cerrar Caja
-              </button>
+              </button></WriteAccess>
             </div>
           </>
         )}
@@ -406,8 +408,8 @@ export function CashRegisterPage() {
               <p className="text-sm text-gray-400">No hay movimientos que coincidan</p>
               {!isClosed && (
                 <div className="flex items-center justify-center gap-2 mt-3">
-                  <button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button>
-                  <button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button>
+                  <WriteAccess><button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button></WriteAccess>
+                  <WriteAccess><button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button></WriteAccess>
                 </div>
               )}
             </div>
@@ -533,8 +535,8 @@ export function CashRegisterPage() {
                     <p className="text-sm text-gray-400">No hay movimientos que coincidan</p>
                     {!isClosed && (
                       <div className="flex items-center justify-center gap-2 mt-3">
-                        <button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button>
-                        <button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button>
+                        <WriteAccess><button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button></WriteAccess>
+                        <WriteAccess><button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button></WriteAccess>
                       </div>
                     )}
                   </td>

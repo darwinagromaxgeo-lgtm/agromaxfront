@@ -1,3 +1,4 @@
+import { WriteAccess } from '../../../shared/components/WriteAccess';
 import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useClientCredits } from '../hooks/useCredits';
@@ -94,12 +95,12 @@ export function ClientCreditDetailPage() {
         <h1 className="text-2xl font-bold text-gray-800">Creditos - {client?.name || 'Cliente'}</h1>
         <div className="ml-auto">
           {openCredits.length > 0 && (
-            <button
+            <WriteAccess><button
               onClick={() => setShowBatch(true)}
               className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm"
             >
               <DollarSign size={16} /> Registrar abono
-            </button>
+            </button></WriteAccess>
           )}
         </div>
       </div>

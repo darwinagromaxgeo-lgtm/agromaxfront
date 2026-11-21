@@ -1,3 +1,4 @@
+import { WriteAccess, useAccountingReadOnly } from '../../../shared/components/WriteAccess';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -14,9 +15,11 @@ import type { AccountPayable, AccountPayableInstallment, AccountPayablePayment, 
 
 // ─── NumeroUnicoEditor ───────────────────────────────────────────────────────
 function NumeroUnicoEditor({ apId, installmentId, value, onSave, isPending, placeholder = 'N° único del banco' }: { apId: string; installmentId?: string; value?: string; onSave: (v: string) => void; isPending: boolean; placeholder?: string }) {
+  const readOnly = useAccountingReadOnly();
   const [draft, setDraft] = useState(value || '');
   useEffect(() => { setDraft(value || ''); }, [value, apId, installmentId]);
   const dirty = draft.trim() !== (value || '').trim();
+  if (readOnly) return <span className="text-xs text-gray-600">{value || '—'}</span>;
   return (
     <div className="flex items-center gap-1">
       <div className="relative flex-1">
@@ -458,12 +461,12 @@ export function AccountsPayablePage() {
                         <div className="text-[10px] text-gray-400">≈ S/ {ap.totalAmountPen.toFixed(2)}</div>
                       )}
                     </div>
-                    <button
+                    <WriteAccess><button
                       onClick={() => { setActiveTab('agreements'); setShowCreateModal(true); setCreateSupplier(ap.supplier); }}
                       className="flex-shrink-0 px-2.5 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-medium hover:bg-purple-700 transition-colors"
                     >
                       Crear acuerdo
-                    </button>
+                    </button></WriteAccess>
                   </div>
                 ))}
               </div>
@@ -642,7 +645,7 @@ export function AccountsPayablePage() {
                                 <div className="flex flex-wrap gap-2 mt-3">
                                   <button onClick={() => setViewingId(payment.apId)} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 px-3 py-2 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors font-medium"><Eye size={13} /> Ver detalle</button>
                                   {payment.ap.status !== 'PAID' && (
-                                    <button onClick={() => openAPPayment(payment.ap)} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 text-xs text-primary-600 hover:text-primary-800 px-3 py-2 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors font-medium"><DollarSign size={13} /> Registrar pago</button>
+                                    <WriteAccess><button onClick={() => openAPPayment(payment.ap)} className="flex-1 min-w-[110px] flex items-center justify-center gap-1.5 text-xs text-primary-600 hover:text-primary-800 px-3 py-2 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors font-medium"><DollarSign size={13} /> Registrar pago</button></WriteAccess>
                                   )}
                                 </div>
                               </div>
@@ -669,10 +672,10 @@ export function AccountsPayablePage() {
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <p className="text-sm text-gray-500">Facturas consolidadas de un mismo proveedor bajo un plan de pago único.</p>
-            <button onClick={() => { resetCreateForm(); setShowCreateModal(true); }}
+            <WriteAccess><button onClick={() => { resetCreateForm(); setShowCreateModal(true); }}
               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-sm font-semibold transition-colors w-full sm:w-auto">
               <Plus size={16} /> Nuevo Acuerdo
-            </button>
+            </button></WriteAccess>
           </div>
 
           {agLoading ? (
@@ -681,7 +684,7 @@ export function AccountsPayablePage() {
             <div className="text-center py-16 bg-white rounded-xl border border-dashed border-gray-200">
               <ClipboardList size={40} className="mx-auto mb-2 text-gray-300" />
               <div className="text-sm text-gray-400">No hay acuerdos de pago registrados</div>
-              <button onClick={() => { resetCreateForm(); setShowCreateModal(true); }} className="mt-3 text-sm text-primary-600 hover:underline">Crear el primero</button>
+              <WriteAccess><button onClick={() => { resetCreateForm(); setShowCreateModal(true); }} className="mt-3 text-sm text-primary-600 hover:underline">Crear el primero</button></WriteAccess>
             </div>
           ) : (
             <div className="space-y-4">
@@ -829,14 +832,14 @@ export function AccountsPayablePage() {
                         <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> Acuerdo completamente pagado</span>
                       ) : (
                         <div className="flex gap-2">
-                          <button onClick={() => openAgPayment(ag)} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs text-primary-600 hover:text-primary-800 px-3 py-2 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors font-medium">
+                          <WriteAccess><button onClick={() => openAgPayment(ag)} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs text-primary-600 hover:text-primary-800 px-3 py-2 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors font-medium">
                             <DollarSign size={13} /> Registrar Pago
-                          </button>
+                          </button></WriteAccess>
                           {ag.paidAmount === 0 && (
-                            <button onClick={() => { setSelectedAgreement(ag); setShowCancelModal(true); }}
+                            <WriteAccess><button onClick={() => { setSelectedAgreement(ag); setShowCancelModal(true); }}
                               className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 text-xs text-red-600 hover:text-red-800 px-3 py-2 bg-red-50 rounded-lg hover:bg-red-100 transition-colors font-medium">
                               <Ban size={13} /> Anular
-                            </button>
+                            </button></WriteAccess>
                           )}
                         </div>
                       )}

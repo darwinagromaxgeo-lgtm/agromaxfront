@@ -1,3 +1,4 @@
+import { WriteAccess } from '../../../shared/components/WriteAccess';
 import { useState, useRef } from 'react';
 import { useParams, Link, useLocation, useNavigate } from 'react-router-dom';
 import { usePurchase, useRegisterReception, usePurchaseAccountPayable, useDeletePurchase } from '../hooks/usePurchases';
@@ -164,20 +165,20 @@ export function PurchaseDetailPage() {
           </span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Link
+          <WriteAccess><Link
             to={`/purchases/${purchase.id}/edit`}
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 shadow-sm"
           >
             <Pencil size={14} /> Editar
-          </Link>
+          </Link></WriteAccess>
           {(user?.role === 'ADMIN' || user?.role === 'VENDEDOR') && (
-            <button
+            <WriteAccess><button
               type="button"
               onClick={() => setShowDeleteModal(true)}
               className="flex items-center gap-1.5 px-3 py-2 bg-white border border-red-200 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 shadow-sm"
             >
               <Trash2 size={14} /> Eliminar
-            </button>
+            </button></WriteAccess>
           )}
         </div>
       </div>
@@ -390,9 +391,9 @@ export function PurchaseDetailPage() {
           title={`Productos (${purchase.items.length})`}
           icon={Package}
           extra={canReceive && (
-            <button onClick={() => openModal(purchase)} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-semibold hover:bg-primary-700">
+            <WriteAccess><button onClick={() => openModal(purchase)} className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-semibold hover:bg-primary-700">
               <PackageCheck size={14} /> Registrar recepción
-            </button>
+            </button></WriteAccess>
           )}
         >
           {/* Mobile cards */}

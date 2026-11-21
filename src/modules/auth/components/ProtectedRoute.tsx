@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { AppLoading } from '../../../shared/components/AppLoading';
-import { canAccessView, roleHome } from '../../../shared/utils/accessPolicy';
+import { accessRole, canAccessView, roleHome } from '../../../shared/utils/accessPolicy';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,13 +10,13 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, selectedBranch } = useAuth();
   const location = useLocation();
   if (isLoading) return <div className="min-h-screen grid place-items-center bg-[#f7f7ef]"><AppLoading /></div>;
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  if (!canAccessView(user.role, location.pathname) || (roles && !roles.includes(user.role))) {
+  if (!canAccessView(accessRole(user, selectedBranch?.id), location.pathname) || (roles && !roles.includes(user.role))) {
     return <Navigate to={roleHome(user.role)} replace />;
   }
   return <>{children}</>;

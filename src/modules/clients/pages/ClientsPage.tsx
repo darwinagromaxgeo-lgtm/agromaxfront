@@ -1,3 +1,4 @@
+import { WriteAccess } from '../../../shared/components/WriteAccess';
 import React, { useState } from 'react';
 import { useClients, useCreateClient, useUpdateClient } from '../hooks/useClients';
 import { DataTable } from '../../../shared/components/DataTable';
@@ -101,7 +102,7 @@ export function ClientsPage() {
     { key: 'actions', header: 'Acciones', render: (item: Client) => (
       <div className="flex items-center gap-2">
         {canViewCreditStatements && <ExportClientStatementButton client={item} variant="icon" />}
-        <button onClick={() => openEdit(item)} className="text-blue-600 hover:text-blue-800" title="Editar"><Edit2 size={16} /></button>
+        <WriteAccess><button onClick={() => openEdit(item)} className="text-blue-600 hover:text-blue-800" title="Editar"><Edit2 size={16} /></button></WriteAccess>
       </div>
     )},
   ];
@@ -117,7 +118,7 @@ export function ClientsPage() {
             Cartera de <span className="font-medium text-gray-700">{selectedBranch?.name || 'la sucursal activa'}</span>
           </p>
         </div>
-        <button onClick={openCreate} className="flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"><Plus size={18} /> Nuevo Cliente</button>
+        <WriteAccess><button onClick={openCreate} className="flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"><Plus size={18} /> Nuevo Cliente</button></WriteAccess>
       </div>
       <div className="mb-4 relative">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -150,9 +151,9 @@ export function ClientsPage() {
             </div>
             <div className="flex gap-2">
               {canViewCreditStatements && <ExportClientStatementButton client={client} variant="icon" />}
-              <button onClick={() => openEdit(client)} className="flex items-center justify-center gap-1.5 flex-1 py-2 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+              <WriteAccess><button onClick={() => openEdit(client)} className="flex items-center justify-center gap-1.5 flex-1 py-2 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
                 <Edit2 size={13} /> Editar
-              </button>
+              </button></WriteAccess>
             </div>
           </div>
         ))}

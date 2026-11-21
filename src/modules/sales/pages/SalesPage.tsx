@@ -1,3 +1,4 @@
+import { WriteAccess, useAccountingReadOnly } from '../../../shared/components/WriteAccess';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -47,7 +48,8 @@ type PaymentMode = string; // paymentMethodId | 'MIXED' | 'CREDIT'
 
 export function SalesPage() {
   const { selectedBranch, user } = useAuth();
-  const canManageSales = user?.role !== 'VENDEDOR';
+  const readOnly = useAccountingReadOnly();
+  const canManageSales = user?.role !== 'VENDEDOR' && !readOnly;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'sales' | 'boletas' | 'facturas' | 'loans'>('sales');
@@ -431,7 +433,7 @@ export function SalesPage() {
       <div className="flex items-center gap-2">
         <button onClick={(e) => { e.stopPropagation(); setViewingSale(item); }} className="text-primary-600 hover:text-primary-800 flex items-center gap-1 text-xs font-medium"><Eye size={15} /> Ver</button>
         {!item.isCancelled && canCancelSale(item) && (
-          <button onClick={(e) => { e.stopPropagation(); setCancellingSale(item); setCancelReason(''); }} className="text-red-500 hover:text-red-700 flex items-center gap-1 text-xs font-medium"><XCircle size={15} /> Anular</button>
+          <WriteAccess><button onClick={(e) => { e.stopPropagation(); setCancellingSale(item); setCancelReason(''); }} className="text-red-500 hover:text-red-700 flex items-center gap-1 text-xs font-medium"><XCircle size={15} /> Anular</button></WriteAccess>
         )}
       </div>
     )},
@@ -457,7 +459,7 @@ export function SalesPage() {
       <div className="flex items-center gap-2">
         <button onClick={(e) => { e.stopPropagation(); setViewingSale(item); }} className="text-primary-600 hover:text-primary-800 flex items-center gap-1 text-xs font-medium"><Eye size={15} /> Ver</button>
         {!item.isCancelled && canCancelSale(item) && (
-          <button onClick={(e) => { e.stopPropagation(); setCancellingSale(item); setCancelReason(''); }} className="text-red-500 hover:text-red-700 flex items-center gap-1 text-xs font-medium"><XCircle size={15} /> Anular</button>
+          <WriteAccess><button onClick={(e) => { e.stopPropagation(); setCancellingSale(item); setCancelReason(''); }} className="text-red-500 hover:text-red-700 flex items-center gap-1 text-xs font-medium"><XCircle size={15} /> Anular</button></WriteAccess>
         )}
       </div>
     )},
@@ -482,7 +484,7 @@ export function SalesPage() {
       <div className="flex items-center gap-2">
         <button onClick={(e) => { e.stopPropagation(); setViewingLoan(item); }} className="text-blue-600 hover:text-blue-800 flex items-center gap-1 text-xs font-medium"><Eye size={15} /> Ver</button>
         {item.status !== 'RETURNED' && (
-          <button onClick={(e) => { e.stopPropagation(); openReturn(item); }} className="text-purple-600 hover:text-purple-800 flex items-center gap-1 text-xs font-medium"><RotateCcw size={15} /> Devolver</button>
+          <WriteAccess><button onClick={(e) => { e.stopPropagation(); openReturn(item); }} className="text-purple-600 hover:text-purple-800 flex items-center gap-1 text-xs font-medium"><RotateCcw size={15} /> Devolver</button></WriteAccess>
         )}
       </div>
     )},
@@ -499,9 +501,9 @@ export function SalesPage() {
         <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><Receipt size={24} /> Ventas</h1>
         <div className="flex flex-col sm:flex-row gap-2">
           <button type="button" onClick={() => { void queryClient.invalidateQueries({ queryKey: ['sales'] }); void salesBilling.refetch(); }} className="flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-sm text-gray-700"><RefreshCw size={16} /> Actualizar</button>
-          {canManageSales && <button onClick={openLoanCreate} className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+          {canManageSales && <WriteAccess><button onClick={openLoanCreate} className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
             <HandshakeIcon size={18} /> Préstamo
-          </button>}
+          </button></WriteAccess>}
         </div>
       </div>
 
@@ -641,7 +643,7 @@ export function SalesPage() {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setViewingSale(sale)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"><Eye size={13} /> Ver detalle</button>
-                      {!cancelled && canCancelSale(sale) && <button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button>}
+                      {!cancelled && canCancelSale(sale) && <WriteAccess><button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button></WriteAccess>}
                     </div>
                   </div>
                 );
@@ -682,7 +684,7 @@ export function SalesPage() {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setViewingSale(sale)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"><Eye size={13} /> Ver detalle</button>
-                      {!cancelled && canCancelSale(sale) && <button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button>}
+                      {!cancelled && canCancelSale(sale) && <WriteAccess><button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button></WriteAccess>}
                     </div>
                   </div>
                 );
@@ -723,7 +725,7 @@ export function SalesPage() {
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => setViewingSale(sale)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"><Eye size={13} /> Ver detalle</button>
-                      {!cancelled && canCancelSale(sale) && <button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button>}
+                      {!cancelled && canCancelSale(sale) && <WriteAccess><button onClick={() => { setCancellingSale(sale); setCancelReason(''); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"><XCircle size={13} /> Anular</button></WriteAccess>}
                     </div>
                   </div>
                 );
@@ -754,7 +756,7 @@ export function SalesPage() {
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setViewingLoan(loan)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"><Eye size={13} /> Ver</button>
-                    {loan.status !== 'RETURNED' && <button onClick={() => openReturn(loan)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"><RotateCcw size={13} /> Devolver</button>}
+                    {loan.status !== 'RETURNED' && <WriteAccess><button onClick={() => openReturn(loan)} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"><RotateCcw size={13} /> Devolver</button></WriteAccess>}
                   </div>
                 </div>
               ))}
@@ -966,14 +968,14 @@ export function SalesPage() {
               </div>
               <div className="bg-gray-50 rounded-lg p-3">
                 <span className="block text-xs text-gray-500 mb-1">Comprobante</span>
-                {viewingSale.isCancelled || !fiscalKnown || viewingDocuments.length > 0 ? (
+                {readOnly || viewingSale.isCancelled || !fiscalKnown || viewingDocuments.length > 0 ? (
                   <span className={`text-sm font-medium ${viewingSale.voucherType === 'BOLETA' ? 'text-primary-600' : viewingSale.voucherType === 'FACTURA' ? 'text-blue-600' : 'text-gray-500'}`}>
                     {fiscalKnown ? saleVoucherLabel(viewingSale, viewingDocuments) : viewingSale.voucherType === 'BOLETA' ? 'Boleta' : viewingSale.voucherType === 'FACTURA' ? 'Factura' : 'Nota de venta'}
                   </span>
                 ) : (
                   <div className="flex gap-1">
                     {([['NONE', 'Nota de venta'], ['BOLETA', 'Boleta'], ['FACTURA', 'Factura']] as const).map(([val, label]) => (
-                      <button key={val} type="button"
+                      <WriteAccess key={val}><button key={val} type="button"
                         className={`px-2 py-1 rounded text-xs font-medium transition-colors ${viewingSale.voucherType === val ? (val === 'BOLETA' ? 'bg-primary-600 text-white' : val === 'FACTURA' ? 'bg-blue-600 text-white' : 'bg-gray-600 text-white') : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
                         disabled={updateVoucher.isPending}
                         onClick={() => {
@@ -983,7 +985,7 @@ export function SalesPage() {
                             });
                           }
                         }}
-                      >{label}</button>
+                      >{label}</button></WriteAccess>
                     ))}
                   </div>
                 )}
@@ -1291,12 +1293,12 @@ export function SalesPage() {
             )}
 
             {viewingLoan.status !== 'RETURNED' && (
-              <button
+              <WriteAccess><button
                 onClick={() => { setViewingLoan(null); openReturn(viewingLoan); }}
                 className="w-full py-2.5 bg-purple-600 text-white rounded-xl hover:bg-purple-700 font-semibold flex items-center justify-center gap-2 transition-colors"
               >
                 <RotateCcw size={16} /> Registrar Devolución
-              </button>
+              </button></WriteAccess>
             )}
           </div>
         )}

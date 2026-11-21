@@ -1,3 +1,4 @@
+import { WriteAccess, useAccountingReadOnly } from '../../../shared/components/WriteAccess';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -41,6 +42,7 @@ function apiError(error: any): string { const message = error?.response?.data?.m
 function today() { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' }); }
 
 function IdentityCheck({ document }: { document: BillingDocument }) {
+  const readOnly = useAccountingReadOnly();
   const lookup = useMutation({
     mutationFn: async () => {
       if (document.receiver.documentType === 'RUC') {
@@ -52,7 +54,7 @@ function IdentityCheck({ document }: { document: BillingDocument }) {
     },
     onError: error => toast.error(apiError(error)),
   });
-  if (document.receiver.documentType === 'UNIDENTIFIED') return null;
+  if (readOnly || document.receiver.documentType === 'UNIDENTIFIED') return null;
   return <div className="rounded-lg border border-gray-200 p-3 space-y-2 text-sm">
     <button className={buttonClass} disabled={lookup.isPending} onClick={() => lookup.mutate()}><Search size={15} /> {lookup.isPending ? 'Consultando…' : 'Consultar cliente en Decolecta'}</button>
     <p className="text-xs text-gray-500">Consulta de identidad de DNI/RUC. No emite comprobantes ni modifica los datos guardados.</p>
@@ -99,7 +101,8 @@ export function BillingPage() {
   const branchRef = useRef(branchId);
   branchRef.current = branchId;
   const role = user?.role === 'ADMIN' ? 'ADMIN' : user?.branchAssignments?.find(assignment => assignment.branchId === branchId)?.role || user?.role;
-  const allowed = !!branchId && (role === 'ADMIN' || role === 'VENDEDOR');
+  const readOnly = useAccountingReadOnly();
+  const allowed = !!branchId && (role === 'ADMIN' || role === 'VENDEDOR' || readOnly);
   const [page, setPage] = useState(1);
   const [notesView,setNotesView]=useState(false);
   const [creditOriginalId,setCreditOriginalId]=useState('');
@@ -140,8 +143,8 @@ export function BillingPage() {
   useEffect(() => {
     if (!allowed) return;
     if (linkedDocument && /^[a-f\d]{24}$/i.test(linkedDocument)) setDetailId(linkedDocument);
-    else if (linkedSale && /^[a-f\d]{24}$/i.test(linkedSale)) { setSaleId(linkedSale); setCreateOpen(true); }
-  }, [allowed, branchId, linkedDocument, linkedSale]);
+    else if (!readOnly && linkedSale && /^[a-f\d]{24}$/i.test(linkedSale)) { setSaleId(linkedSale); setCreateOpen(true); }
+  }, [allowed, readOnly, branchId, linkedDocument, linkedSale]);
   useEffect(() => { setLegacyConfirmed(false); }, [saleId, groupKey, documentType]);
 
   const connection = useQuery({ queryKey: ['billing-connection', branchId], queryFn: billingService.status, enabled: allowed, retry: false, staleTime: 30_000 });
@@ -151,11 +154,11 @@ export function BillingPage() {
   const exampleDocument = useMemo(() => billingFormatExample(exampleCompany, exampleType), [exampleCompany, exampleType]);
   const filters = { page, limit: 15, startDate: startDate || undefined, endDate: endDate || undefined, companyId: companyId || undefined, documentType: type || undefined, status: status || undefined };
   const documents = useQuery({ queryKey: ['billing', branchId, filters], queryFn: () => billingService.list(filters), enabled: allowed });
-  const sales = useQuery<{ data: Sale[]; total: number }>({ queryKey: ['billing-sales', branchId, salePage, startDate, endDate], queryFn: () => saleService.getAll({ page: salePage, limit: 20, startDate: startDate || undefined, endDate: endDate || undefined }), enabled: allowed && createOpen });
-  const groups = useQuery({ queryKey: ['billing-groups', branchId, saleId], queryFn: () => billingService.groups(saleId), enabled: allowed && createOpen && !!saleId, retry: false });
+  const sales = useQuery<{ data: Sale[]; total: number }>({ queryKey: ['billing-sales', branchId, salePage, startDate, endDate], queryFn: () => saleService.getAll({ page: salePage, limit: 20, startDate: startDate || undefined, endDate: endDate || undefined }), enabled: allowed && !readOnly && createOpen });
+  const groups = useQuery({ queryKey: ['billing-groups', branchId, saleId], queryFn: () => billingService.groups(saleId), enabled: allowed && !readOnly && createOpen && !!saleId, retry: false });
   const group = groups.data?.find(item => `${item.companyId}:${item.taxType}` === groupKey);
   useEffect(() => { if (!groupKey && groups.data?.length) setGroupKey(`${groups.data[0].companyId}:${groups.data[0].taxType}`); }, [groupKey, groups.data]);
-  const saleReceiver = useQuery({ queryKey: ['billing-sale-receiver', branchId, saleId], queryFn: () => billingService.saleReceiver(saleId), enabled: allowed && createOpen && !!saleId });
+  const saleReceiver = useQuery({ queryKey: ['billing-sale-receiver', branchId, saleId], queryFn: () => billingService.saleReceiver(saleId), enabled: allowed && !readOnly && createOpen && !!saleId });
   useEffect(() => {
     if (!saleReceiver.data || recipientTouched) return;
     const selected = sales.data?.data.find(sale => sale.id === saleId);
@@ -163,7 +166,7 @@ export function BillingPage() {
   }, [saleReceiver.data, saleId, recipientTouched, sales.data]);
   const recipientError = recipientFormError(recipient, group?.total || 0);
   const draftInput: BillingDraftInput | null = group && !recipientError ? { saleId, companyId: group.companyId, taxType: group.taxType, documentType, receiver: recipientParty(recipient) } : null;
-  const preview = useQuery({ queryKey: ['billing-preview', branchId, draftInput], queryFn: () => billingService.preview(draftInput!), enabled: allowed && createOpen && !!draftInput, retry: false });
+  const preview = useQuery({ queryKey: ['billing-preview', branchId, draftInput], queryFn: () => billingService.preview(draftInput!), enabled: allowed && !readOnly && createOpen && !!draftInput, retry: false });
   const detail = useQuery({ queryKey: ['billing-detail', branchId, detailId], queryFn: () => billingService.get(detailId!), enabled: allowed && !!detailId });
   const document = detail.data;
   useEffect(() => { setIssueConfirmed(false); }, [document?.id, document?.receiverRevision, connection.data?.environment]);
@@ -191,13 +194,13 @@ export function BillingPage() {
     setDownloading(true);
     try { await downloadBillingDraft(draft, simulated); } catch { toast.error('No se pudo generar el PDF'); } finally { setDownloading(false); }
   };
-  if (!allowed) return <div className="rounded-xl bg-white border p-6 text-gray-600">Selecciona una sucursal con acceso de administrador o vendedor para abrir Facturación.</div>;
+  if (!allowed) return <div className="rounded-xl bg-white border p-6 text-gray-600">Selecciona una sucursal con acceso a Facturación.</div>;
   if (notesView) return <div className="space-y-5"><div className="flex flex-wrap items-center justify-between gap-3"><h1 className="text-2xl font-bold text-gray-800">Facturación</h1><div className="flex gap-2"><button className={buttonClass} onClick={()=>setNotesView(false)}>Ver comprobantes</button><button className={buttonClass} onClick={()=>connection.refetch()} disabled={connection.isFetching}><RefreshCw size={14} /> Verificar conexión</button></div></div><CreditNotesPanel key={branchId} branchId={branchId!} connection={connection.data} initialOriginalId={creditOriginalId} onOriginalConsumed={()=>setCreditOriginalId('')} onReissue={id=>{setNotesView(false);setReissueId(id);}} /></div>;
 
   return <div className="space-y-5">
     {reissueId && <BillingReissueModal key={`${branchId}:${reissueId}`} originalId={reissueId} branchId={branchId!} onClose={()=>setReissueId('')} onSaved={result=>{if(result.branchId!==branchRef.current)return;setReissueId('');refresh(result);}} />}
     <div><button className={buttonClass} onClick={()=>setNotesView(true)}><Undo2 size={16} /> Notas de crédito</button></div>
-    <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><FileCheck2 size={25} /> Facturación</h1><p className="text-sm text-gray-500 mt-1">Comprobantes de venta separados por empresa y afectación tributaria.</p></div><div className="flex flex-wrap gap-2"><button className={buttonClass} onClick={() => { setFormatPreview(null); setExampleOpen(true); }}><Eye size={17} /> Ver formatos</button><button className={primaryClass} onClick={() => { setSaleId(''); setGroupKey(''); setSalePage(1); setRecipient(recipientFormFromParty()); setRecipientTouched(false); setCreateOpen(true); }}><Plus size={17} /> Preparar comprobante</button></div></div>
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2"><FileCheck2 size={25} /> Facturación</h1><p className="text-sm text-gray-500 mt-1">Comprobantes de venta separados por empresa y afectación tributaria.</p></div><div className="flex flex-wrap gap-2"><button className={buttonClass} onClick={() => { setFormatPreview(null); setExampleOpen(true); }}><Eye size={17} /> Ver formatos</button><WriteAccess><button className={primaryClass} onClick={() => { setSaleId(''); setGroupKey(''); setSalePage(1); setRecipient(recipientFormFromParty()); setRecipientTouched(false); setCreateOpen(true); }}><Plus size={17} /> Preparar comprobante</button></WriteAccess></div></div>
     <div className={`rounded-xl border p-4 ${connection.data?.ready ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
       <div className="flex flex-wrap justify-between gap-3"><div><p className="font-semibold text-sm">{connection.isFetching ? 'Comprobando conexión…' : connection.data?.simulationReady ? 'Microservicio de simulación disponible' : connection.data?.ready ? 'Servicio de facturación disponible' : 'Preparación de comprobantes disponible'}</p><p className="text-sm mt-1">{connection.error ? 'No se pudo consultar el servicio. Revisa la conexión con el backend.' : connection.data?.message}</p>{connection.data?.issuerRuc && <p className="text-xs mt-2">Emisor: {connection.data.issuerName || connection.data.issuerRuc} · RUC {connection.data.issuerRuc} · {connection.data.environment === 'simulation' ? 'Simulación' : connection.data.environment === 'production' ? 'Producción' : 'Pruebas'}</p>}</div><button className={buttonClass} onClick={() => connection.refetch()} disabled={connection.isFetching}><RefreshCw size={14} /> Verificar conexión</button></div>
     </div>
@@ -233,13 +236,13 @@ export function BillingPage() {
       {detail.isLoading ? <p>Cargando…</p> : detail.error ? <p className="text-red-700">{apiError(detail.error)}</p> : document && <div className="space-y-5"><button className={buttonClass} onClick={() => setFormatPreview({ document })}><Eye size={16} /> Vista A4 y ticket</button><DocumentSummary document={document} /><IdentityCheck key={`${branchId}:${document.id}`} document={document} />
       {simulationResult && document.status === 'DRAFT' && <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3"><p className="font-bold text-blue-900">SIMULACIÓN · SIN VALIDEZ TRIBUTARIA</p><button className={buttonClass} onClick={() => setFormatPreview({ document: simulationResult.document, simulation: true })}><Eye size={16} /> Ver simulación en A4 y ticket</button><p className="text-sm">{simulationResult.message}</p>{simulationResult.service && <p className="text-sm font-medium">{simulationResult.service.message}</p>}<ul className="space-y-2 text-sm">{simulationResult.checks.map(check => <li key={check.label}><span className="font-semibold">{check.passed ? '✓' : 'Pendiente:'} {check.label}.</span> {check.detail}</li>)}</ul><button className={buttonClass} disabled={downloading} onClick={() => simulationResult.service?.verified ? billingService.downloadSimulation(simulationResult, 'pdf') : downloadDraft(simulationResult.document, true)}><Download size={15} /> Descargar PDF de simulación</button>{simulationResult.service?.verified && <button className={`${buttonClass} ml-2`} onClick={() => billingService.downloadSimulation(simulationResult, 'xml')}><Download size={15} /> XML de simulación</button>}</div>}
       <div className="flex flex-wrap gap-2">
-        {document.status==='ACCEPTED' && !document.cancelledByCreditNoteId && <button className={buttonClass} onClick={()=>{setCreditOriginalId(document.id);setDetailId(null);setNotesView(true);}}><Undo2 size={15} /> Anular comprobante con nota de crédito</button>}
-        {document.cancelledByCreditNoteId && <button className={primaryClass} onClick={()=>{setReissueId(document.id);setDetailId(null);}}>Volver a emitir pedido</button>}
+        {document.status==='ACCEPTED' && !document.cancelledByCreditNoteId && <WriteAccess><button className={buttonClass} onClick={()=>{setCreditOriginalId(document.id);setDetailId(null);setNotesView(true);}}><Undo2 size={15} /> Anular comprobante con nota de crédito</button></WriteAccess>}
+        {document.cancelledByCreditNoteId && <WriteAccess><button className={primaryClass} onClick={()=>{setReissueId(document.id);setDetailId(null);}}>Volver a emitir pedido</button></WriteAccess>}
         {document.replacementDocumentId && <button className={buttonClass} onClick={()=>setDetailId(document.replacementDocumentId!)}>Ver comprobante nuevo</button>}
         {document.replacesDocumentId && <button className={buttonClass} onClick={()=>setDetailId(document.replacesDocumentId!)}>Ver comprobante anterior</button>}
-        {document.status === 'DRAFT' && <button className={primaryClass} disabled={simulation.isPending} onClick={() => simulation.mutate(document.id)}><FlaskConical size={15} /> {simulation.isPending ? 'Simulando…' : 'Simular sin enviar'}</button>}
-        {document.status === 'DRAFT' && <><button className={buttonClass} disabled={downloading} onClick={() => downloadDraft(document)}><Download size={15} /> PDF de borrador</button><button className={`${buttonClass} text-red-600`} onClick={() => { setDiscardReason(''); setDiscardOpen(true); }}><Trash2 size={15} /> Descartar borrador</button><button className={primaryClass} disabled={issue.isPending || saveReceiver.isPending} onClick={() => { setIssueRecipient(recipientFormFromParty(document.receiver, document.documentType)); setIssueStep('receiver'); setIssueConfirmed(false); setIssueOpen(true); }}><Send size={15} /> Preparar envío</button></>}
-        {document.status === 'PENDING' && <button className={primaryClass} disabled={check.isPending} onClick={() => check.mutate(document.id)}><RefreshCw size={15} /> {check.isPending ? 'Consultando…' : 'Consultar estado SUNAT'}</button>}
+        {document.status === 'DRAFT' && <WriteAccess><button className={primaryClass} disabled={simulation.isPending} onClick={() => simulation.mutate(document.id)}><FlaskConical size={15} /> {simulation.isPending ? 'Simulando…' : 'Simular sin enviar'}</button></WriteAccess>}
+        {document.status === 'DRAFT' && <><button className={buttonClass} disabled={downloading} onClick={() => downloadDraft(document)}><Download size={15} /> PDF de borrador</button><WriteAccess><button className={`${buttonClass} text-red-600`} onClick={() => { setDiscardReason(''); setDiscardOpen(true); }}><Trash2 size={15} /> Descartar borrador</button></WriteAccess><WriteAccess><button className={primaryClass} disabled={issue.isPending || saveReceiver.isPending} onClick={() => { setIssueRecipient(recipientFormFromParty(document.receiver, document.documentType)); setIssueStep('receiver'); setIssueConfirmed(false); setIssueOpen(true); }}><Send size={15} /> Preparar envío</button></WriteAccess></>}
+        {document.status === 'PENDING' && <WriteAccess><button className={primaryClass} disabled={check.isPending} onClick={() => check.mutate(document.id)}><RefreshCw size={15} /> {check.isPending ? 'Consultando…' : 'Consultar estado SUNAT'}</button></WriteAccess>}
         {document.hasPdf && <button className={buttonClass} disabled={downloading} onClick={() => download('pdf')}><Download size={15} /> PDF</button>}
         {document.hasXml && <button className={buttonClass} disabled={downloading} onClick={() => download('xml')}><Download size={15} /> XML</button>}
         {document.hasCdr && <button className={buttonClass} disabled={downloading} onClick={() => download('cdr')}><Download size={15} /> CDR</button>}

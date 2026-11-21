@@ -12,7 +12,7 @@ import {
 import type { AccountPayable } from '../types';
 import { BranchSelector } from './BranchSelector';
 import { BrandLogo } from './BrandLogo';
-import { canAccessView, roleHome } from '../utils/accessPolicy';
+import { accessRole, canAccessView, isAccountingReadOnly, roleHome } from '../utils/accessPolicy';
 
 type NavItem = { path: string; label: string; icon: any; roles?: string[] };
 type NavSection = { label: string; items: NavItem[] };
@@ -73,6 +73,8 @@ const navSections: NavSection[] = [
 
 export function Layout() {
   const { user, logout, branches, selectedBranch, selectBranch } = useAuth();
+  const readOnly = isAccountingReadOnly(user, selectedBranch?.id);
+  const viewRole = accessRole(user, selectedBranch?.id);
   const isSeller = user?.role === 'VENDEDOR';
   const home = roleHome(user?.role);
   const bottomNav = isSeller ? [
@@ -179,7 +181,7 @@ export function Layout() {
         <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-5">
           {navSections.map((section) => {
             const visibleItems = section.items.filter(
-              (item) => canAccessView(user?.role, item.path) && (!item.roles || item.roles.includes(user?.role || '')),
+              (item) => canAccessView(viewRole, item.path) && (!item.roles || item.roles.includes(user?.role || '')),
             );
             if (visibleItems.length === 0) return null;
             return (
@@ -222,7 +224,7 @@ export function Layout() {
               <div className="text-sm font-medium text-gray-800 truncate">
                 {user?.fullName || user?.username}
               </div>
-              <div className="text-xs text-gray-500 truncate">{user?.role}</div>
+              <div className="text-xs text-gray-500 truncate">{user?.role === 'CONTABILIDAD' ? 'Contabilidad' : user?.role}</div>
             </div>
             <button
               onClick={logout}
@@ -363,13 +365,14 @@ export function Layout() {
         </header>
 
         <main className="flex-1 p-4 pb-24 lg:p-8 overflow-auto min-w-0">
+          {readOnly && <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">Contabilidad · Solo consulta y descarga</div>}
           <Outlet />
         </main>
 
         {/* Mobile Bottom Navigation Bar */}
         <nav className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 lg:hidden">
           <div className="flex items-stretch h-16">
-            {bottomNav.map(({ path, label, icon: Icon }) => {
+            {bottomNav.filter(item => canAccessView(viewRole, item.path)).map(({ path, label, icon: Icon }) => {
               const isActive = path === '/dashboard'
                 ? location.pathname === path || location.pathname === '/'
                 : location.pathname === path || location.pathname.startsWith(path + '/');
@@ -445,7 +448,7 @@ export function Layout() {
           <div className="overflow-y-auto flex-1 px-4 py-3 space-y-4">
             {navSections.map((section) => {
               const visibleItems = section.items.filter(
-                (item) => canAccessView(user?.role, item.path) && (!item.roles || item.roles.includes(user?.role || '')),
+                (item) => canAccessView(viewRole, item.path) && (!item.roles || item.roles.includes(user?.role || '')),
               );
               if (visibleItems.length === 0) return null;
               return (
@@ -484,7 +487,7 @@ export function Layout() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-sm font-medium text-gray-800 truncate">{user?.fullName || user?.username}</div>
-              <div className="text-xs text-gray-500">{user?.role}</div>
+              <div className="text-xs text-gray-500">{user?.role === 'CONTABILIDAD' ? 'Contabilidad' : user?.role}</div>
             </div>
             <button
               onClick={logout}

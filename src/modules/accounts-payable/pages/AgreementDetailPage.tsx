@@ -1,3 +1,4 @@
+import { WriteAccess } from '../../../shared/components/WriteAccess';
 import { useRef, useState } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
 import { usePaymentAgreementById, useUploadAgreementVoucher, useUploadInstallmentVoucher } from '../hooks/usePaymentAgreements';
@@ -284,14 +285,14 @@ export function AgreementDetailPage() {
                         <input type="file" accept="image/*"
                           className="hidden" id={`inst-gal-${instId}`}
                           onChange={async e => { const f = e.target.files?.[0]; if (f && inst.id) { await handleInstVoucherFile(f, inst.id); e.target.value = ''; } }} />
-                        <label htmlFor={`inst-cam-${instId}`}
+                        <WriteAccess><label htmlFor={`inst-cam-${instId}`}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors border border-green-200 ${isUploadingInst ? 'opacity-50 pointer-events-none' : ''} ${inst.voucherUrl ? 'bg-white hover:bg-gray-50 text-gray-600' : 'bg-white hover:bg-primary-50 text-primary-600'}`}>
                           <Camera size={13} /> {inst.voucherUrl ? 'Cambiar' : 'Cámara'}
-                        </label>
-                        <label htmlFor={`inst-gal-${instId}`}
+                        </label></WriteAccess>
+                        <WriteAccess><label htmlFor={`inst-gal-${instId}`}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-gray-50 text-gray-600 text-xs font-medium cursor-pointer transition-colors border border-green-200 ${isUploadingInst ? 'opacity-50 pointer-events-none' : ''}`}>
                           <ImageIcon size={13} /> Galería
-                        </label>
+                        </label></WriteAccess>
                         {isUploadingInst && <span className="text-xs text-gray-400 animate-pulse">Subiendo...</span>}
                       </div>
                     </div>
@@ -370,16 +371,16 @@ export function AgreementDetailPage() {
                         onChange={async e => { const f = e.target.files?.[0]; if (f && p.id) { await handleVoucherFile(f, p.id); e.target.value = ''; } }} />
 
                       {/* Cámara */}
-                      <label htmlFor={`cam-${payId}`}
+                      <WriteAccess><label htmlFor={`cam-${payId}`}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${isUploading ? 'opacity-50 pointer-events-none' : ''} ${p.voucherUrl ? 'bg-gray-100 hover:bg-gray-200 text-gray-600' : 'bg-primary-50 hover:bg-primary-100 text-primary-600'}`}>
                         <Camera size={13} /> {p.voucherUrl ? 'Cambiar' : 'Cámara'}
-                      </label>
+                      </label></WriteAccess>
 
                       {/* Galería */}
-                      <label htmlFor={`gal-${payId}`}
+                      <WriteAccess><label htmlFor={`gal-${payId}`}
                         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-medium cursor-pointer transition-colors ${isUploading ? 'opacity-50 pointer-events-none' : ''}`}>
                         <ImageIcon size={13} /> Galería
-                      </label>
+                      </label></WriteAccess>
 
                       {isUploading && <span className="text-xs text-gray-400 animate-pulse">Subiendo...</span>}
                     </div>

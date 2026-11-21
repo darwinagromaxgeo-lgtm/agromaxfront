@@ -1,3 +1,4 @@
+import { WriteAccess } from '../../../shared/components/WriteAccess';
 import React, { useMemo, useState } from 'react';
 import { useCredits, useDeleteCredit, useCreditById } from '../hooks/useCredits';
 import { useClients } from '../../clients/hooks/useClients';
@@ -246,12 +247,12 @@ export function CreditsPage() {
                     {/* Actions — stop propagation */}
                     <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       {group.pendingAmount > 0 && (
-                        <button
+                        <WriteAccess><button
                           onClick={() => openBatchForGroup(group)}
                           className="flex items-center gap-1 px-2.5 py-1.5 bg-primary-600 text-white text-xs font-semibold rounded-lg hover:bg-primary-700 transition-colors"
                         >
                           <DollarSign size={13} /> Registrar abono
-                        </button>
+                        </button></WriteAccess>
                       )}
                       <button
                         onClick={() => navigate(`/credits/client/${group.clientId}`)}
@@ -306,12 +307,12 @@ export function CreditsPage() {
                                 <button onClick={() => handleDownloadCreditPdf(c)} disabled={pdfLoadingId === c.id} className="px-2.5 py-1.5 text-gray-500 hover:text-primary-600 bg-gray-50 hover:bg-gray-100 rounded-md disabled:opacity-50 transition-colors">
                                   {pdfLoadingId === c.id ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
                                 </button>
-                                <button onClick={() => openEdit(c)} className="px-2.5 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
+                                <WriteAccess><button onClick={() => openEdit(c)} className="px-2.5 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
                                   <Edit2 size={13} />
-                                </button>
-                                <button onClick={() => openDelete(c)} className="px-2.5 py-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors">
+                                </button></WriteAccess>
+                                <WriteAccess><button onClick={() => openDelete(c)} className="px-2.5 py-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors">
                                   <Trash2 size={13} />
-                                </button>
+                                </button></WriteAccess>
                               </div>
                             </div>
                           );
@@ -349,8 +350,8 @@ export function CreditsPage() {
                                       <button onClick={() => handleDownloadCreditPdf(c)} disabled={pdfLoadingId === c.id} className="text-gray-500 hover:text-primary-600 disabled:opacity-50">
                                         {pdfLoadingId === c.id ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
                                       </button>
-                                      <button onClick={() => openEdit(c)} className="text-blue-600 hover:text-blue-800"><Edit2 size={13} /></button>
-                                      <button onClick={() => openDelete(c)} className="text-red-600 hover:text-red-800"><Trash2 size={13} /></button>
+                                      <WriteAccess><button onClick={() => openEdit(c)} className="text-blue-600 hover:text-blue-800"><Edit2 size={13} /></button></WriteAccess>
+                                      <WriteAccess><button onClick={() => openDelete(c)} className="text-red-600 hover:text-red-800"><Trash2 size={13} /></button></WriteAccess>
                                     </div>
                                   </td>
                                 </tr>

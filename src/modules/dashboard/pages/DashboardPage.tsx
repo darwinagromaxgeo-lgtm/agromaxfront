@@ -1,3 +1,4 @@
+import { useAccountingReadOnly } from '../../../shared/components/WriteAccess';
 import { useState, useMemo } from 'react';
 import { useDashboardSummary, useCreditsSummary, useSalesChart, useCategorySales, useTopSuppliers, useCategorySalesChart, useExchangeRate, usePurchaseByCategory, useFinancialOverview, useCategoryPurchaseChart, useSubcategorySalesChart, useSubcategoryPurchaseChart } from '../hooks/useDashboard';
 import { useCategories } from '../../categories/hooks/useCategories';
@@ -121,6 +122,7 @@ function QuickAction({ icon: Icon, label, onClick, accent }: {
 }
 
 export function DashboardPage() {
+  const readOnly = useAccountingReadOnly();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [period, setPeriod] = useState('daily');
@@ -330,18 +332,18 @@ export function DashboardPage() {
           Acciones rápidas
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <QuickAction
+          {!readOnly && <QuickAction
             icon={ShoppingCart}
             label="Nueva Venta"
             onClick={() => navigate('/pos')}
             accent="bg-primary-100 text-primary-700"
-          />
-          <QuickAction
+          />}
+          {!readOnly && <QuickAction
             icon={Package}
             label="Productos"
             onClick={() => navigate('/products')}
             accent="bg-blue-100 text-blue-600"
-          />
+          />}
           <QuickAction
             icon={Wallet}
             label="Caja"

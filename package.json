@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "prebuild": "node scripts/sync-brand-assets.cjs",
     "brand:sync": "node scripts/sync-brand-assets.cjs",
-    "test:pwa": "node --test tests/pwa.test.mjs"
+    "test:pwa": "node --test tests/pwa.test.mjs",
+    "test:accounting": "node --test tests/accounting-access.test.mjs tests/seller-views.test.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.0",

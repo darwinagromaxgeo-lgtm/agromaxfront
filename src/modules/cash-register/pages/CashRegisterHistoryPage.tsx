@@ -1,3 +1,4 @@
+import { WriteAccess } from '../../../shared/components/WriteAccess';
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCashRegisters, useCashRegisterById, useCloseCashRegister } from '../hooks/useCashRegister';
@@ -270,10 +271,10 @@ export function CashRegisterHistoryPage() {
                           <Eye size={12} /> Detalle
                         </button>
                         {isOpen && !isToday && (
-                          <button onClick={() => openClose(reg)}
+                          <WriteAccess><button onClick={() => openClose(reg)}
                             className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
                             <Lock size={12} /> Cerrar
-                          </button>
+                          </button></WriteAccess>
                         )}
                       </div>
                     </td>
