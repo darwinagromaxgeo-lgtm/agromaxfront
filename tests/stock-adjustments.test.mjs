@@ -35,7 +35,7 @@ test('one batch includes all chosen products, their starting quantities and the 
   assert.deepEqual(result.items.map(item => [item.productId, item.type, item.quantity, item.expectedQuantity]), [['product-1', 'SET', 20, 50], ['product-2', 'INCREASE', 3, 50]]);
 });
 test('invalid rows never produce a partial request', () => {
-  for (const rows of [[], [row(), row()], [row({ productId: '' })], [row({ quantity: '' })], [row({ expectedQuantity: undefined })], [row({ type: 'DECREASE', quantity: '51' })], Array.from({ length: 101 }, (_, index) => row({ productId: String(index) }))]) assert.throws(() => buildStockAdjustmentBatch('company-1', 'Conteo', rows, randomUUID()));
+  for (const rows of [[], [row(), row()], [row({ productId: '' })], [row({ quantity: '' })], [row({ expectedQuantity: undefined })], [row({ type: 'DECREASE', quantity: '51' })], Array.from({ length: 1001 }, (_, index) => row({ productId: String(index) }))]) assert.throws(() => buildStockAdjustmentBatch('company-1', 'Conteo', rows, randomUUID()));
   assert.throws(() => buildStockAdjustmentBatch('', 'Conteo', [row()], randomUUID()));
   assert.throws(() => buildStockAdjustmentBatch('company-1', '   ', [row()], randomUUID()));
   assert.throws(() => buildStockAdjustmentBatch('company-1', 'Conteo', [row({ quantity: '50' })], randomUUID()), /ya coinciden/);
@@ -57,22 +57,6 @@ function loadWithMocks(relative, mocks) {
   return loaded.exports;
 }
 
-test('the modal exposes final count, sum, subtract and adding another product in the same form', () => {
-  const never = () => { throw Error('Rendering must not write stock'); };
-  const { StockAdjustmentModal } = loadWithMocks('../src/modules/stock/components/StockAdjustmentModal.tsx', {
-    '@tanstack/react-query': { useQuery: ({ queryKey }) => ({ isSuccess: true, isFetching: false, isError: false, data: queryKey[0] === 'stock' ? { data: [{ productId: 'p1', quantity: 50 }] } : [], refetch: never }) },
-    '../../../shared/components/Modal': { Modal: ({ title, children }) => React.createElement('section', null, React.createElement('h2', null, title), children) },
-    '../../../shared/components/SearchableSelect': { SearchableSelect: () => React.createElement('input', { 'aria-label': 'Producto', readOnly: true }) },
-    '../services/stockService': { stockService: {} }, '../services/productLotService': { productLotService: {} },
-    '../hooks/useStockAdjustments': { useCreateStockAdjustmentBatch: () => ({ isPending: false, mutateAsync: never }) },
-    '../utils/stockAdjustment': loadTs(fileURLToPath(new URL('../src/modules/stock/utils/stockAdjustment.ts', import.meta.url))),
-  });
-  const html = renderToStaticMarkup(React.createElement(StockAdjustmentModal, { companies: [{ id: 'c1', name: 'Agromax' }], products: [{ id: 'p1', name: 'Producto', unit: 'UND', isActive: true }], companyId: 'c1', productId: 'p1', branchName: 'Sausal', onClose: never }));
-  for (const label of ['Establecer cantidad', 'Sumar unidades', 'Restar unidades', 'Cantidad final que tienes', 'Agregar otro producto', 'Motivo del ajuste', 'Sausal', 'Actualizar stock y revisar']) assert.ok(html.includes(label), label);
-  assert.match(html, /value="SET" selected=""/); assert.match(html, /min="0"/);
-  assert.match(html, /disabled=""[^>]*>Guardar 0 ajustes/);
-});
-
 test('adjustment snapshots include products after the first stock page', async () => {
   const calls = [];
   const { stockService } = loadWithMocks('../src/modules/stock/services/stockService.ts', {
@@ -85,4 +69,47 @@ test('adjustment snapshots include products after the first stock page', async (
   const result = await stockService.getAdjustmentSnapshot('company-1');
   assert.deepEqual(result.data.map(item => item.productId), ['p1', 'p2']); assert.equal(calls.length, 2);
   assert.ok(calls.every(call => call.url === '/stock/company/company-1' && call.limit === 1000));
+});
+
+const { stockCountGroups, updateStockCount, stockCountSummary } = loadTs(fileURLToPath(new URL('../src/modules/stock/utils/stockCount.ts', import.meta.url)));
+
+test('count rows leave blanks untouched, retain zero and freeze the baseline across edits', () => {
+  let rows = updateStockCount([], 'p1', '20', 50);
+  rows = updateStockCount(rows, 'p1', '21', 49);
+  assert.equal(rows[0].expectedQuantity, 50);
+  rows = updateStockCount(rows, 'p2', '0', 8);
+  assert.equal(rows[1].quantity, '0'); assert.equal(rows[1].movementKind, 'COUNT');
+  rows = updateStockCount(rows, 'p1', '', 49);
+  assert.deepEqual(rows.map(row => row.productId), ['p2']);
+  assert.deepEqual(stockCountSummary(rows), { counted: 1, changed: 1, valid: true });
+  const payload = buildStockAdjustmentBatch('company-1', 'Conteo', rows, randomUUID(), true);
+  assert.equal(payload.items.length, 1); assert.equal(payload.items[0].quantity, 0);
+});
+
+test('a matching physical count can be saved without inventing a stock movement', () => {
+  const rows = updateStockCount([], 'p1', '50', 50);
+  assert.deepEqual(stockCountSummary(rows), { counted: 1, changed: 0, valid: true });
+  assert.equal(buildStockAdjustmentBatch('company-1', 'Conteo', rows, randomUUID(), true).items[0].quantity, 50);
+});
+
+test('count search groups the catalog by category and matches supplier and accents', () => {
+  const products = [
+    { id: 'p1', name: 'Abono Maíz', supplier: 'Marca Norte', categoryId: 'c1', isActive: true },
+    { id: 'p2', name: 'Insecticida', supplier: 'Marca Sur', categoryId: 'c2', isActive: true },
+    { id: 'p3', name: 'Archivado', categoryId: 'c1', isActive: false },
+  ];
+  const categories = [{ id: 'c1', name: 'Fertilizantes' }, { id: 'c2', name: 'Insecticidas' }];
+  assert.deepEqual(stockCountGroups(products, categories, '').map(group => [group.name, group.products.length]), [['Fertilizantes', 1], ['Insecticidas', 1]]);
+  assert.equal(stockCountGroups(products, categories, 'maiz norte')[0].products[0].id, 'p1');
+  assert.equal(stockCountGroups(products, categories, 'insecticidas')[0].products[0].id, 'p2');
+  assert.equal(stockCountGroups(products, categories, 'no existe').length, 0);
+});
+
+test('waste is a decrease with its own audit label, and a full catalog count exceeds 100 products', () => {
+  const { stockMovementModes, stockAdjustmentLabel } = loadTs(fileURLToPath(new URL('../src/modules/stock/utils/stockAdjustment.ts', import.meta.url)));
+  assert.equal(stockMovementModes.WASTE, 'DECREASE');
+  assert.equal(stockAdjustmentLabel({ type: 'DECREASE', movementKind: 'WASTE' }), 'Merma');
+  assert.equal(stockAdjustmentLabel({ type: 'DECREASE', mode: 'SET' }), 'Conteo físico');
+  const rows = Array.from({ length: 101 }, (_, index) => row({ productId: 'p' + index }));
+  assert.equal(buildStockAdjustmentBatch('company-1', 'Conteo', rows, randomUUID()).items.length, 101);
 });

@@ -43,7 +43,7 @@ export function useCreateStockAdjustmentBatch() {
         qc.invalidateQueries({ queryKey: [key] });
       }
       const count = result.adjustments.length;
-      toast.success(count === 1 ? 'Stock actualizado' : `${count} productos actualizados`);
+      toast.success(count === 0 ? 'Conteo guardado sin diferencias' : count === 1 ? 'Stock actualizado' : `${count} productos actualizados`);
     },
   });
 }

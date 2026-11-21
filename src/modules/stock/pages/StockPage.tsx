@@ -14,7 +14,10 @@ import {
 } from 'lucide-react';
 import type { Stock, Company, Product, StockAdjustment, ProductLot } from '../../../shared/types';
 import { useAuth } from '../../../app/providers/AuthProvider';
-import { StockAdjustmentModal } from '../components/StockAdjustmentModal';
+import { StockCountModal } from '../components/StockCountModal';
+import { StockMovementModal } from '../components/StockMovementModal';
+import { useCategories } from '../../categories/hooks/useCategories';
+import { stockAdjustmentLabel } from '../utils/stockAdjustment';
 
 type ImportRow = { excelName: string; quantity: number; matched: Product | null };
 
@@ -25,6 +28,7 @@ export function StockPage() {
   const [companyId, setCompanyId] = useState('');
   const [showTransfer, setShowTransfer] = useState(false);
   const [showAdjustment, setShowAdjustment] = useState(false);
+  const [showCount, setShowCount] = useState(false);
   const [adjPage, setAdjPage] = useState(1);
   const [showLowStockDetail, setShowLowStockDetail] = useState(false);
   const [showAllLowStock, setShowAllLowStock] = useState(false);
@@ -42,6 +46,8 @@ export function StockPage() {
   const importFileRef = useRef<HTMLInputElement>(null);
 
   const { data: companies } = useCompanies();
+  const { data: categoriesData } = useCategories();
+  const categories = Array.isArray(categoriesData) ? categoriesData : [];
   const { data: productsData } = useProducts({ limit: 200 });
   const { data: allProductsData } = useProducts({ limit: 1000 });
   const { data, isLoading } = useStock(companyId, { page: 1, limit: 1000 });
@@ -61,7 +67,7 @@ export function StockPage() {
     return acc;
   }, {});
   const [adjustmentPreset, setAdjustmentPreset] = useState({ productId: '', companyId: '' });
-  React.useEffect(() => { setShowAdjustment(false); }, [selectedBranch?.id]);
+  React.useEffect(() => { setShowAdjustment(false); setShowCount(false); }, [selectedBranch?.id]);
 
   const companyList = (Array.isArray(companies) ? companies : []).filter((company: Company) =>
     company.isActive
@@ -344,8 +350,8 @@ export function StockPage() {
           </button>
           {activeTab === 'inventory' && (
             <>
-              <button onClick={() => openAdjustment()} className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
-                <ClipboardList size={15} /> Ajustar stock
+              <button onClick={() => setShowCount(true)} className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
+                <ClipboardList size={15} /> Conteo de stock
               </button>
               <button onClick={openTransfer} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
                 <ArrowRightLeft size={15} /> Transferir
@@ -622,7 +628,7 @@ export function StockPage() {
                 <div key={item.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0">
-                      <div className="font-medium text-gray-800 text-sm leading-snug">{getProductName(item.productId)}</div>
+                      <button type="button" onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId || companyId })} className="font-medium text-gray-800 text-sm leading-snug text-left hover:text-orange-600 hover:underline">{getProductName(item.productId)}</button>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         {product?.tracksLot && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-semibold">LOTES</span>}
                         {location && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-700 border border-purple-200 font-semibold">{location}</span>}
@@ -640,7 +646,7 @@ export function StockPage() {
                     ) : <div />}
                     <button onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId })}
                       className="px-2.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg text-xs font-medium border border-orange-200 transition-colors">
-                      Ajustar
+                      Movimiento
                     </button>
                   </div>
                   {hasLots && isExpanded && (
@@ -691,11 +697,11 @@ export function StockPage() {
                     <React.Fragment key={item.id}>
                       <tr className="hover:bg-primary-50/40 transition-colors">
                         <td className="px-2">{hasLots && (<button onClick={() => setExpandedStock(s => ({ ...s, [item.id]: !s[item.id] }))} className="p-1.5 text-gray-300 hover:text-primary-500 rounded transition-colors">{isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>)}</td>
-                        <td className="px-4 py-3"><div className="flex items-center gap-2 flex-wrap"><span className="font-medium text-gray-800">{getProductName(item.productId)}</span>{product?.tracksLot && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-semibold">LOTES</span>}{getProductLocation(item.productId) && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-700 border border-purple-200 font-semibold">{getProductLocation(item.productId)}</span>}</div></td>
+                        <td className="px-4 py-3"><div className="flex items-center gap-2 flex-wrap"><button type="button" onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId || companyId })} className="font-medium text-gray-800 text-left hover:text-orange-600 hover:underline">{getProductName(item.productId)}</button>{product?.tracksLot && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-blue-100 text-blue-700 border border-blue-200 font-semibold">LOTES</span>}{getProductLocation(item.productId) && <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-purple-100 text-purple-700 border border-purple-200 font-semibold">{getProductLocation(item.productId)}</span>}</div></td>
                         <td className="px-4 py-3 text-gray-400 text-xs">{getProductUnit(item.productId)}</td>
                         <td className="px-4 py-3">{qtyBadge(item.quantity)}</td>
                         <td className="px-4 py-3 text-gray-400 text-xs">{item.lastUpdated && !isNaN(new Date(item.lastUpdated).getTime()) ? new Date(item.lastUpdated).toLocaleDateString('es-PE') : '—'}</td>
-                        <td className="px-4 py-3 text-right"><button onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId })} className="px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg text-xs font-medium border border-orange-200 transition-colors">Ajustar</button></td>
+                        <td className="px-4 py-3 text-right"><button onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId })} className="px-2.5 py-1 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-lg text-xs font-medium border border-orange-200 transition-colors">Movimiento</button></td>
                       </tr>
                       {hasLots && isExpanded && (
                         <tr className="bg-blue-50/30"><td></td><td colSpan={5} className="px-4 py-3">
@@ -791,7 +797,7 @@ export function StockPage() {
         <>
           <div className="flex justify-end mb-3">
             <button onClick={() => openAdjustment()} className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium shadow-sm transition-colors">
-              <Plus size={16} /> Nuevo Ajuste
+              <Plus size={16} /> Nuevo movimiento
             </button>
           </div>
           {/* Mobile cards */}
@@ -804,12 +810,10 @@ export function StockPage() {
               <div key={item.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                 <div className="flex items-start justify-between gap-2 mb-1.5">
                   <div className="min-w-0">
-                    <div className="font-medium text-gray-800 text-sm leading-snug">{getProductName(item.productId)}</div>
+                    <button type="button" onClick={() => openAdjustment({ productId: item.productId, companyId: item.companyId || companyId })} className="font-medium text-gray-800 text-sm leading-snug text-left hover:text-orange-600 hover:underline">{getProductName(item.productId)}</button>
                     <div className="text-xs text-gray-400 mt-0.5">{new Date(item.date).toLocaleDateString('es-PE')} · {getCompanyName(item.companyId)}</div>
                   </div>
-                  {item.mode === 'SET' ? <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-semibold border border-blue-200">Cantidad final</span> : item.type === 'INCREASE'
-                    ? <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-semibold border border-green-200 flex-shrink-0">Aumento</span>
-                    : <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-semibold border border-red-200 flex-shrink-0">Disminución</span>}
+                  <AdjustmentBadge adjustment={item} />
                 </div>
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <span>Cant: <span className="font-semibold text-gray-800">{item.quantity}</span></span>
@@ -844,7 +848,7 @@ export function StockPage() {
                     <td className="px-4 py-3 text-gray-500 text-xs">{new Date(item.date).toLocaleDateString('es-PE')}</td>
                     <td className="px-4 py-3 font-medium text-gray-800">{getProductName(item.productId)}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{getCompanyName(item.companyId)}</td>
-                    <td className="px-4 py-3">{item.mode === 'SET' ? <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-semibold border border-blue-200">Cantidad final</span> : item.type === 'INCREASE' ? <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-semibold border border-green-200">Aumento</span> : <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-semibold border border-red-200">Disminución</span>}</td>
+                    <td className="px-4 py-3"><AdjustmentBadge adjustment={item} /></td>
                     <td className="px-4 py-3 text-right font-semibold text-gray-800">{item.quantity}</td>
                     <td className="px-4 py-3 text-right text-xs text-gray-500">{item.previousQuantity} → <span className="font-semibold text-gray-700">{item.newQuantity}</span></td>
                     <td className="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">{item.reason}</td>
@@ -953,10 +957,21 @@ export function StockPage() {
         </form>
       </Modal>
 
-      {showAdjustment && <StockAdjustmentModal
+      {showCount && <StockCountModal
+        key={`count-${selectedBranch?.id}`}
+        companies={companyList}
+        products={allProducts.length > 0 ? allProducts : products}
+        categories={categories}
+        companyId={companyId || companyList[0]?.id || ''}
+        branchName={selectedBranch?.name || 'Sucursal activa'}
+        onClose={() => setShowCount(false)}
+      />}
+
+      {showAdjustment && <StockMovementModal
         key={selectedBranch?.id}
         companies={companyList}
         products={allProducts.length > 0 ? allProducts : products}
+        categories={categories}
         companyId={adjustmentPreset.companyId}
         productId={adjustmentPreset.productId}
         branchName={selectedBranch?.name || 'Sucursal activa'}
@@ -1059,4 +1074,10 @@ export function StockPage() {
       </Modal>
     </div>
   );
+}
+
+function AdjustmentBadge({ adjustment }: { adjustment: StockAdjustment }) {
+  const kind = adjustment.movementKind || (adjustment.mode === 'SET' ? 'COUNT' : adjustment.type === 'INCREASE' ? 'ENTRY' : 'EXIT');
+  const color = kind === 'COUNT' ? 'bg-blue-100 text-blue-700 border-blue-200' : kind === 'WASTE' ? 'bg-amber-100 text-amber-800 border-amber-200' : kind === 'ENTRY' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200';
+  return <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0 ${color}`}>{stockAdjustmentLabel(adjustment)}</span>;
 }
