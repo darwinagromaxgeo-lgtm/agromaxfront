@@ -9,8 +9,9 @@ import { activeFiscalDocuments, billingBlocksCancellation, billingReference, fis
 export function SaleBillingBadge({ sale, documents, loading, error }: { sale: Sale; documents: BillingDocument[]; loading: boolean; error: boolean }) {
   if (loading) return <span className="text-xs text-gray-400">Consultando comprobante…</span>;
   if (error) return <span className="text-xs text-amber-700">Estado no disponible</span>;
-  if (!documents.length) return <span className="text-xs text-gray-500">{sale.voucherType === 'NONE' ? 'Nota de venta' : `${sale.voucherType === 'FACTURA' ? 'Factura' : 'Boleta'} · sin emitir`}</span>;
-  return <div className="space-y-1.5">{saleUsesInternalNote(sale, documents) && <p className="text-xs font-semibold text-slate-700">Nota de venta</p>}{documents.map(document => <div key={document.id} className="flex flex-wrap items-center gap-1.5">
+  const noteReference = sale.noteSeries && sale.noteNumber ? `${sale.noteSeries}-${String(sale.noteNumber).padStart(8, '0')}` : '';
+  if (!documents.length) return <span className="text-xs text-gray-500">{sale.voucherType === 'NONE' ? `Nota de venta${noteReference ? ` · ${noteReference}` : ''}` : `${sale.voucherType === 'FACTURA' ? 'Factura' : 'Boleta'} · sin emitir`}</span>;
+  return <div className="space-y-1.5">{saleUsesInternalNote(sale, documents) && <p className="text-xs font-semibold text-slate-700">Nota de venta{noteReference ? ` · ${noteReference}` : ''}</p>}{documents.map(document => <div key={document.id} className="flex flex-wrap items-center gap-1.5">
     <span className="font-mono text-xs font-semibold text-slate-800">{billingReference(document)}</span>
     <span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${fiscalDocumentState(document).color}`}>{fiscalDocumentState(document).label}</span>
     {document.environment === 'beta' && <span className="text-[10px] text-slate-500">Pruebas</span>}

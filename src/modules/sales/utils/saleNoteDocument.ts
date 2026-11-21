@@ -2,6 +2,10 @@ import type { Client, Company, Product, Sale } from '../../../shared/types';
 import type { BillingItem, BillingTaxType } from '../../billing/types';
 import type { SaleNotePrintDocument } from '../../billing/utils/printTypes';
 
+export function saleNoteReference(sale: Pick<Sale, 'id' | 'noteSeries' | 'noteNumber'>): string {
+  return sale.noteSeries && sale.noteNumber ? `${sale.noteSeries}-${String(sale.noteNumber).padStart(8, '0')}` : `NV-${sale.id.slice(-8).toUpperCase()}`;
+}
+
 export function saleNoteDocument({ sale, companies, client, products, branchId }: {
   sale: Sale; companies: Company[]; client?: Client; products: Product[]; branchId: string;
 }): SaleNotePrintDocument {
@@ -30,13 +34,14 @@ export function saleNoteDocument({ sale, companies, client, products, branchId }
   const documentNumber = client?.documentNumber || '';
   return {
     id: sale.id, branchId, companyId: company?.id || '', saleId: sale.id, documentType: 'NOTA_VENTA',
-    internalReference: `NV-${sale.id.slice(-8).toUpperCase()}`, status: sale.isCancelled ? 'DISCARDED' : 'DRAFT',
+    internalReference: saleNoteReference(sale), status: sale.isCancelled ? 'DISCARDED' : 'DRAFT',
     taxType: types.length > 1 ? 'MIXTO' : types[0] || 'GRAVADO', currency: 'PEN', paymentCondition: sale.isCredit ? 'CREDITO' : 'CONTADO',
     saleDate: sale.date, createdAt: sale.createdAt,
     issuer: { name: company?.name || (issuers.length > 1 ? 'VENTA MULTIEMPRESA' : 'AGROMAX'), documentType: 'RUC', documentNumber: company?.ruc, address: company?.address },
     receiver: { name: client?.name || 'Consumidor final', documentType: documentNumber.length === 11 ? 'RUC' : documentNumber.length === 8 ? 'DNI' : 'UNIDENTIFIED', documentNumber: documentNumber || undefined, address: client?.address },
     items, taxableAmount: base('GRAVADO'), exemptAmount: base('EXONERADO'), unaffectedAmount: base('INAFECTO'),
     taxAmount: items.reduce((sum, item) => sum + Math.round(item.taxAmount * 100), 0) / 100, total: sale.total,
+    payments: sale.payments, issuerPhone: company?.phone,
     legacyTaxData, warnings: legacyTaxData ? ['Nota de una venta anterior: algunos datos tributarios se completaron con el catálogo actual.'] : [],
   };
 }

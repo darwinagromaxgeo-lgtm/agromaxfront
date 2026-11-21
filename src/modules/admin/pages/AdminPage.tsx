@@ -1,5 +1,5 @@
 import { Link, Navigate } from 'react-router-dom';
-import { Building2, Layers, Package, Ruler, ScrollText, Shield, ShoppingCart, Users, BarChart3, ArrowRight, GitBranch } from 'lucide-react';
+import { Building2, Layers, Package, Ruler, ScrollText, Shield, ShoppingCart, Users, BarChart3, ArrowRight, GitBranch, Landmark } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { useCompanies } from '../../companies/hooks/useCompanies';
@@ -49,6 +49,7 @@ function AdminDashboard({ user }: { user: User }) {
   }, {});
 
   const quickLinks: QuickLink[] = [
+    { to: '/settings/bank-accounts', label: 'Cuentas bancarias', description: 'Cuentas para cotizaciones', icon: Landmark },
     { to: '/companies', label: 'Empresas', description: 'Entidades fiscales y RUC', icon: Building2 },
     { to: '/users', label: 'Usuarios', description: 'Accesos y roles', icon: Shield },
     { to: '/branches', label: 'Sucursales', description: 'Tiendas y operación aislada', icon: GitBranch },

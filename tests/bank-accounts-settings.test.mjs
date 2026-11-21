@@ -1,0 +1,33 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { createRequire, Module } from 'node:module';
+import React from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
+import ts from 'typescript';
+const require=createRequire(import.meta.url),{QueryClient,QueryClientProvider}=require('@tanstack/react-query');
+const text=node=>typeof node==='string'?node:(node?.children||[]).map(text).join('');
+test('administrator saves bank accounts for the selected company, retains leading zeroes and reloads safely after conflicts',async t=>{
+ const companies=[{id:'company1',name:'Empresa uno',ruc:'20600000001',isActive:true,bankAccountsRevision:2,bankAccounts:[]},{id:'company2',name:'Empresa dos',ruc:'20600000002',isActive:true,bankAccountsRevision:0,bankAccounts:[]}];
+ let fail=false;const writes=[];
+ const filename=fileURLToPath(new URL('../src/modules/settings/pages/BankAccountsPage.tsx',import.meta.url));const loaded=new Module(filename);loaded.filename=filename;loaded.paths=Module._nodeModulePaths(fileURLToPath(new URL('../',import.meta.url)));const original=loaded.require.bind(loaded);
+ loaded.require=specifier=>{
+  if(specifier==='react-hot-toast')return {success(){}};
+  if(specifier==='../../companies/hooks/useCompanies')return {useCompanies:()=>({data:companies,refetch:async()=>({data:companies})})};
+  if(specifier==='../../companies/services/companyService')return {companyService:{saveBankAccounts:async(id,accounts,expectedRevision)=>{writes.push({id,accounts,expectedRevision});if(fail)throw {response:{data:{message:'Otro administrador actualizó las cuentas'}}};return {...companies.find(c=>c.id===id),bankAccounts:accounts,bankAccountsRevision:expectedRevision+1};}}};
+  return original(specifier);
+ };
+ loaded._compile(ts.transpileModule(readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText,filename);
+ const client=new QueryClient({defaultOptions:{mutations:{retry:false}}});let tree;
+ const settle=async()=>act(async()=>{await new Promise(resolve=>setTimeout(resolve,5));});
+ await act(async()=>{tree=TestRenderer.create(React.createElement(QueryClientProvider,{client},React.createElement(loaded.exports.BankAccountsPage)));});await settle();t.after(()=>{act(()=>tree.unmount());client.clear();});
+ const click=async label=>{const button=tree.root.findAllByType('button').find(button=>text(button).trim()===label);assert.ok(button,label);await act(async()=>button.props.onClick());await settle();};
+ const field=async(label,value)=>act(async()=>tree.root.findByProps({'aria-label':label}).props.onChange({target:{value}}));
+ await click('Agregar cuenta');await field('Banco 1','Banco de prueba');await field('Número de cuenta 1','001234567890');await field('CCI 1','00123456789012345678');
+ await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));await settle();
+ assert.equal(writes[0].id,'company1');assert.equal(writes[0].expectedRevision,2);assert.equal(writes[0].accounts[0].accountNumber,'001234567890');assert.equal(writes[0].accounts[0].holder,'Empresa uno');
+ fail=true;await field('Banco 1','Cambio sin guardar');await act(async()=>tree.root.findByType('form').props.onSubmit({preventDefault(){}}));await settle();
+ assert.equal(tree.root.findByProps({'aria-label':'Banco 1'}).props.value,'Cambio sin guardar');assert.ok(text(tree.root).includes('Otro administrador'));
+ await field('Empresa emisora','company2');await settle();assert.equal(tree.root.findAllByProps({'aria-label':'Banco 1'}).length,0,'Accounts must not carry over to a different issuer');
+});

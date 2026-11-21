@@ -6,7 +6,8 @@ export interface ProductActiveIngredient { name: string; concentration?: string;
 export interface ProductCatalogImport { deduplication?: { canonicalProductId: string; canonicalSku?: string; inventoryConsolidated?: boolean; };  key: string; branchId: string; branchName: string; sourceFile: string; sourceDate: string; presentation: string; sources: string[]; pendingCategoryId: string; taxProposal?: string; taxConfiguration?: 'PROVISIONAL_GRAVADO' | 'SOURCE_EXCEL'; format?: 'SAUSAL_EXPORT'; sourceSku?: string; baseSalePrice?: number; offerSalePrice?: number; offerActive?: boolean; sourceStock?: number; sourceGeneralStock?: number; stockStatus?: 'IMPORTED' | 'IMPORTED_INACTIVE' | 'PENDING_NEGATIVE' | 'INACTIVE_SOURCE'; originalExportRow?: Record<string, string | number>; reviewNotes: string[]; originalRows: { source: string; quantity: string; lot: string; expiration: string; state: string; notes: string }[]; }
 export interface Product { id: string; name: string; description?: string; categoryId: string; unit: string; activeIngredient?: string; activeIngredients?: ProductActiveIngredient[]; taxType?: string; catalogStatus?: 'READY' | 'PENDING_REVIEW'; catalogImport?: ProductCatalogImport; prices: ProductPrice[]; tracksLot?: boolean; isActive: boolean; minSalePrice?: number; minMarginPercent?: number; location?: string; locations?: string[]; supplier?: string; control?: string; cultivo?: string; dosis?: string; imageUrl?: string; createdAt: string; }
 export interface ProductPrice { priceTierId: string; companyId?: string; branchId?: string; price: number; }
-export interface Company { id: string; name: string; ruc: string; address?: string; phone?: string; isActive: boolean; }
+export interface CompanyBankAccount { bank: string; currency: 'PEN' | 'USD'; accountNumber: string; cci?: string; holder: string; isActive: boolean; }
+export interface Company { id: string; name: string; ruc: string; address?: string; phone?: string; bankAccounts?: CompanyBankAccount[]; bankAccountsRevision?: number; isActive: boolean; }
 export interface PriceTier { id: string; name: string; description?: string; priority: number; isActive: boolean; }
 export interface Stock { id: string; productId: string; companyId: string; branchId?: string; quantity: number; lastUpdated: string; }
 export interface BranchAvailabilityPrice { priceTierId: string; price: number; }
@@ -71,7 +72,7 @@ export interface Client { id: string; branchId: string; name: string; documentNu
 
 export interface PaymentMethod { id: string; name: string; isActive: boolean; }
 export interface SalePayment { paymentMethodId: string; paymentMethodName: string; amount: number; }
-export interface Sale { id: string; companyId?: string; clientId?: string; items: SaleItem[]; total: number; voucherType: string; isCredit: boolean; payments: SalePayment[]; isCancelled?: boolean; cancelledBy?: string; cancelledAt?: string; cancelReason?: string; date: string; createdAt: string; }
+export interface Sale { id: string; noteSeries?: string; noteNumber?: number; noteNumberedAt?: string; companyId?: string; clientId?: string; items: SaleItem[]; total: number; voucherType: string; isCredit: boolean; payments: SalePayment[]; isCancelled?: boolean; cancelledBy?: string; cancelledAt?: string; cancelReason?: string; date: string; createdAt: string; }
 export interface SaleItem { productId: string; productName?: string; companyId: string; quantity: number; priceTier: string; unitPrice: number; subtotal: number; unit?: string; taxType?: string; taxRate?: number; }
 export interface Supplier { id: string; ruc: string; businessName: string; address?: string; phone?: string; isActive: boolean; }
 export type PurchaseDocumentType = 'FACTURA' | 'BOLETA' | 'GUIA' | 'NOTA_CREDITO' | 'OTRO';
@@ -84,8 +85,8 @@ export interface Purchase { id: string; companyId: string; supplier: string; sup
 export interface ProductLot { id: string; productId: string; companyId: string; lotNumber: string; expirationDate?: string; initialQuantity: number; currentQuantity: number; purchaseId?: string; receivedAt: string; isActive: boolean; }
 
 export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'CONVERTED';
-export interface QuoteItem { productId: string; companyId: string; quantity: number; priceTier: string; unitPrice: number; subtotal: number; }
-export interface Quote { id: string; quoteNumber: string; series: string; number: number; companyId?: string; clientId?: string; clientName?: string; items: QuoteItem[]; total: number; notes?: string; status: QuoteStatus; issueDate: string; validUntil: string; convertedSaleId?: string; createdBy?: string; createdAt: string; }
+export interface QuoteItem { productId: string; productName?: string; unit?: string; taxType?: string; taxRate?: number; companyId: string; quantity: number; priceTier: string; unitPrice: number; subtotal: number; }
+export interface Quote { id: string; quoteNumber: string; series: string; number: number; companyId?: string; clientId?: string; clientName?: string; clientDetails?: { name: string; documentNumber?: string; address?: string; phone?: string; email?: string }; createdByName?: string; createdByEmail?: string; items: QuoteItem[]; total: number; notes?: string; status: QuoteStatus; issueDate: string; validUntil: string; convertedSaleId?: string; createdBy?: string; createdAt: string; }
 
 export interface AccountPayableInstallment { id?: string; amount: number; dueDate: string; status: 'PENDING' | 'PAID'; paidDate?: string; paidAmountPen?: number; numeroUnico?: string; }
 export interface AccountPayablePayment { id?: string; amount: number; paymentDate: string; codigoTransferencia: string; notes?: string; registeredBy?: string; registeredByName?: string; voucherUrl?: string; }

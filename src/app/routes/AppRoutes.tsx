@@ -37,6 +37,8 @@ const InvoicesPage = lazy(() => import('../../modules/invoices/pages/InvoicesPag
 const BillingPage = lazy(() => import('../../modules/billing/pages/BillingPage').then(m => ({ default: m.BillingPage })));
 const BranchesPage = lazy(() => import('../../modules/branches/pages/BranchesPage').then(m => ({ default: m.BranchesPage })));
 
+const BankAccountsPage = lazy(() => import('../../modules/settings/pages/BankAccountsPage').then(m => ({ default: m.BankAccountsPage })));
+
 const Loading = AppLoading;
 
 function RoleHome() {
@@ -73,6 +75,7 @@ export function AppRoutes() {
         <Route path="price-tiers" element={<ProtectedRoute roles={['ADMIN']}><Suspense fallback={<Loading />}><PriceTiersPage /></Suspense></ProtectedRoute>} />
         <Route path="admin" element={<ProtectedRoute roles={['ADMIN']}><Suspense fallback={<Loading />}><AdminPage /></Suspense></ProtectedRoute>} />
         <Route path="users" element={<ProtectedRoute roles={['ADMIN']}><Suspense fallback={<Loading />}><UsersPage /></Suspense></ProtectedRoute>} />
+        <Route path="settings/bank-accounts" element={<ProtectedRoute roles={['ADMIN']}><Suspense fallback={<Loading />}><BankAccountsPage /></Suspense></ProtectedRoute>} />
         <Route path="branches" element={<ProtectedRoute roles={['ADMIN']}><Suspense fallback={<Loading />}><BranchesPage /></Suspense></ProtectedRoute>} />
         <Route path="kardex" element={<Suspense fallback={<Loading />}><KardexPage /></Suspense>} />
         <Route path="kardex/product/:productId" element={<Suspense fallback={<Loading />}><KardexProductDetailPage /></Suspense>} />

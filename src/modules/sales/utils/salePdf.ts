@@ -1,3 +1,5 @@
+import { buildCommercialDocument } from '../../../shared/branding/commercialDocumentPdf';
+import { saleNoteReference } from './saleNoteDocument';
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import type { Client, Company, Product, Sale } from '../../../shared/types';
@@ -41,6 +43,16 @@ export function buildDocDefinition({ sale, companies, client, products }: SalePd
       ? companyById.get(itemCompanyIds[0])
       : undefined;
   const hasMultipleIssuers = itemCompanyIds.length > 1;
+  if (sale.voucherType === 'NONE') return buildCommercialDocument({
+    kind: 'SALE_NOTE', reference: saleNoteReference(sale), issuedAt: sale.date, total: sale.total,
+    company: issuer || { name: hasMultipleIssuers ? 'VENTA MULTIEMPRESA' : 'AGROMAX', ruc: '' }, client: client || { name: 'Consumidor final' },
+    cancelled: sale.isCancelled, paymentCondition: sale.isCredit ? 'CREDITO' : 'CONTADO', payments: sale.payments,
+    items: sale.items.map(item => { const product = productById.get(item.productId); return {
+      description: (item.productName || product?.name || item.productId) + (hasMultipleIssuers ? ` · ${companyById.get(item.companyId)?.name || item.companyId}` : ''),
+      quantity: item.quantity, unit: item.unit || product?.unit || 'UND', unitPrice: item.unitPrice, subtotal: item.subtotal,
+      taxType: item.taxType || product?.taxType, taxRate: item.taxRate,
+    }; }),
+  });
 
   const baseAmount = sale.items.reduce((sum, item) => {
     const taxType = item.taxType || productById.get(item.productId)?.taxType || 'GRAVADO';
@@ -223,13 +235,16 @@ export function buildDocDefinition({ sale, companies, client, products }: SalePd
 
 const getFileName = (sale: Sale) => {
   const type = sale.voucherType === 'NONE' ? 'nota-venta' : sale.voucherType.toLowerCase();
-  return `${type}-${sale.id.slice(-8)}.pdf`;
+  return sale.voucherType === 'NONE' ? `${saleNoteReference(sale)}.pdf` : `${type}-${sale.id.slice(-8)}.pdf`;
 };
 
-export function openSalePdf(params: SalePdfParams) {
-  pdfMake.createPdf(buildDocDefinition(params) as any).open();
+export async function openSalePdf(params: SalePdfParams, target?: Window) {
+  const pdf = pdfMake.createPdf(buildDocDefinition(params) as any);
+  if (!target) return pdf.open();
+  const url = URL.createObjectURL(await pdf.getBlob()); target.location.href = url;
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export function downloadSalePdf(params: SalePdfParams) {
-  pdfMake.createPdf(buildDocDefinition(params) as any).download(getFileName(params.sale));
+  return pdfMake.createPdf(buildDocDefinition(params) as any).download(getFileName(params.sale));
 }

@@ -353,6 +353,28 @@ export function SalesPage() {
     products,
   });
 
+  const [preparingNote, setPreparingNote] = useState(false);
+  const prepareNote = async (sale: Sale, mode: 'preview' | 'print' | 'download') => {
+    if (preparingNote) return;
+    const target = mode === 'print' ? window.open('', '_blank') : null;
+    if (mode === 'print' && !target) { toast.error('Permite abrir la ventana de impresión o descarga el PDF'); return; }
+    if (target) { target.opener = null; target.document.body.textContent = 'Preparando nota de venta…'; }
+    setPreparingNote(true);
+    try {
+      let current: Sale = await saleService.getById(sale.id);
+      if (!current.noteNumber) {
+        if (readOnly) throw new Error('La nota requiere un correlativo del administrador');
+        const numbered: Sale = await saleService.ensureNoteNumber(sale.id);
+        current = { ...current, noteSeries: numbered.noteSeries, noteNumber: numbered.noteNumber, noteNumberedAt: numbered.noteNumberedAt };
+      }
+      setViewingSale(previous => previous?.id === sale.id ? { ...previous, ...current } : previous);
+      const params = getSalePdfParams({ ...current, voucherType: 'NONE' });
+      if (mode === 'preview') setNotePreview(saleNoteDocument({ ...params, branchId: selectedBranch?.id || '' }));
+      else if (target) await openSalePdf(params, target); else await downloadSalePdf(params);
+    } catch { target?.close(); toast.error('No se pudo preparar la nota de venta. Revisa el correlativo y vuelve a intentar'); }
+    finally { setPreparingNote(false); }
+  };
+
   const saleBaseById = useMemo(() => {
     const allSales: Sale[] = [...sales, ...boletas, ...facturas];
     const map = new Map<string, { base: number; igv: number }>();
@@ -997,20 +1019,17 @@ export function SalesPage() {
                 : viewingSale.voucherType !== 'NONE' && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p>Esta venta aún no tiene un comprobante emitido a SUNAT.</p>{canManageSales ? <a href={`/billing?saleId=${viewingSale.id}`} className="mt-2 inline-block font-semibold underline">Preparar comprobante en Facturación</a> : <p className="mt-2">Solicita la revisión del administrador.</p>}</div>}
 
             {viewingAsNote && <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" onClick={() => {
-                try { setNotePreview(saleNoteDocument({ ...getSalePdfParams({ ...viewingSale, voucherType: 'NONE' }), branchId: selectedBranch?.id || '' })); }
-                catch { toast.error('No se pudo preparar la nota de venta'); }
-              }} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 text-sm font-medium"><Eye size={15} /> Nota de venta · A4 y ticket</button>
+              <button type="button" disabled={preparingNote} onClick={() => prepareNote(viewingSale, 'preview')} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 text-sm font-medium"><Eye size={15} /> Nota de venta · A4 y ticket</button>
               <button
                 type="button"
-                onClick={() => openSalePdf(getSalePdfParams({ ...viewingSale, voucherType: 'NONE' }))}
+                disabled={preparingNote} onClick={() => prepareNote(viewingSale, 'print')}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 text-sm font-medium transition-colors"
               >
                 <Printer size={15} /> Ver / imprimir PDF
               </button>
               <button
                 type="button"
-                onClick={() => downloadSalePdf(getSalePdfParams({ ...viewingSale, voucherType: 'NONE' }))}
+                disabled={preparingNote} onClick={() => prepareNote(viewingSale, 'download')}
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium transition-colors"
               >
                 <Download size={15} /> Descargar PDF

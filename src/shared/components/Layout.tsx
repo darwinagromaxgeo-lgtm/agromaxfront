@@ -7,7 +7,7 @@ import {
   Package, ShoppingCart, TrendingUp, TrendingDown, Users, Building2, Layers, ArrowLeftRight,
   LogOut, Menu, X, Wallet, CreditCard, BarChart3, FolderTree, Shield,
   ClipboardList, FileText, Bell, AlertTriangle, Clock, ScanLine, Ruler, ScrollText, Receipt, LayoutGrid,
-  PackageSearch,
+  PackageSearch, Landmark,
 } from 'lucide-react';
 import type { AccountPayable } from '../types';
 import { BranchSelector } from './BranchSelector';
@@ -65,6 +65,7 @@ const navSections: NavSection[] = [
   {
     label: 'CONFIGURACIÓN',
     items: [
+      { path: '/settings/bank-accounts', label: 'Cuentas bancarias', icon: Landmark, roles: ['ADMIN'] },
       { path: '/admin', label: 'Panel Administrativo', icon: LayoutGrid, roles: ['ADMIN'] },
       { path: '/users', label: 'Usuarios', icon: Shield, roles: ['ADMIN'] },
     ],

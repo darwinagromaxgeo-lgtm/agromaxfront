@@ -1,3 +1,6 @@
+import toast from 'react-hot-toast';
+import { quoteService } from '../services/quoteService';
+import { companyService } from '../../companies/services/companyService';
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuotes, useUpdateQuoteStatus } from '../hooks/useQuotes';
@@ -37,6 +40,7 @@ export function QuotesPage() {
   const { data: companiesData } = useCompanies();
   const { data: clientsData } = useClients();
   const { user } = useAuth();
+  const [preparingPdf, setPreparingPdf] = useState(false);
   const updateStatus = useUpdateQuoteStatus();
 
   const quotes: Quote[] = data?.data || [];
@@ -73,8 +77,22 @@ export function QuotesPage() {
 
   const getCompany = (id?: string) => companies.find(c => c.id === id);
   const getClient  = (id?: string) => clients.find(c => c.id === id);
-  const vendor     = { name: user?.fullName, email: user?.email };
-  const pdfParams  = (q: Quote) => ({ quote: q, products, company: getCompany(q.companyId), client: getClient(q.clientId), vendor });
+  const preparePdf = async (q: Quote, printing = false) => {
+    if (preparingPdf) return;
+    const target = printing ? window.open('', '_blank') : null;
+    if (printing && !target) { toast.error('Permite abrir la ventana de impresión o descarga el PDF'); return; }
+    if (target) { target.opener = null; target.document.body.textContent = 'Preparando cotización…'; }
+    setPreparingPdf(true);
+    try {
+      const [quote, latestCompanies]: [Quote, Company[]] = await Promise.all([quoteService.getById(q.id), companyService.getAll()]);
+      const ids = [...new Set(quote.items.map(item => item.companyId))];
+      const issuerId = quote.companyId || (ids.length === 1 ? ids[0] : undefined);
+      const vendor = { name: quote.createdByName || (quote.createdBy === user?.id ? user?.fullName : undefined), email: quote.createdByEmail || (quote.createdBy === user?.id ? user?.email : undefined) };
+      const params = { quote, products, company: latestCompanies.find(company => company.id === issuerId), client: getClient(quote.clientId), vendor };
+      if (target) await printQuotePdf(params, target); else await downloadQuotePdf(params);
+    } catch { target?.close(); toast.error('No se pudo preparar la cotización. Vuelve a intentar'); }
+    finally { setPreparingPdf(false); }
+  };
 
   const validColor = (q: Quote) => {
     const days = Math.ceil((new Date(q.validUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -118,8 +136,8 @@ export function QuotesPage() {
       key: 'actions', header: '',
       render: (q: Quote) => (
         <div className="flex items-center gap-1">
-          <button onClick={(e) => { e.stopPropagation(); downloadQuotePdf(pdfParams(q)); }} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded" title="Descargar PDF"><Download size={15} /></button>
-          <button onClick={(e) => { e.stopPropagation(); printQuotePdf(pdfParams(q)); }} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded" title="Ver / imprimir PDF"><Printer size={15} /></button>
+          <button onClick={(e) => { e.stopPropagation(); preparePdf(q); }} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded" disabled={preparingPdf} title="Descargar PDF"><Download size={15} /></button>
+          <button onClick={(e) => { e.stopPropagation(); preparePdf(q, true); }} className="p-1.5 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded" disabled={preparingPdf} title="Ver / imprimir PDF"><Printer size={15} /></button>
           {(q.status === 'PENDING' || q.status === 'ACCEPTED') && (
             <button onClick={(e) => { e.stopPropagation(); navigate(`/pos?fromQuote=${q.id}`); }} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Convertir a venta"><ShoppingCart size={15} /></button>
           )}
@@ -275,13 +293,15 @@ export function QuotesPage() {
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => downloadQuotePdf(pdfParams(q))}
+                    disabled={preparingPdf}
+                    onClick={() => preparePdf(q)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
                   >
                     <Download size={13} /> Descargar
                   </button>
                   <button
-                    onClick={() => printQuotePdf(pdfParams(q))}
+                    disabled={preparingPdf}
+                    onClick={() => preparePdf(q, true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
                   >
                     <Printer size={13} /> Imprimir

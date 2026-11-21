@@ -1,3 +1,4 @@
+import { buildCommercialDocument } from '../../../shared/branding/commercialDocumentPdf';
 import pdfMake from 'pdfmake/build/pdfmake';
 import pdfFonts from 'pdfmake/build/vfs_fonts';
 import logo from '../../../shared/branding/logoData';
@@ -9,6 +10,12 @@ import { billingMoney, billingPresentation, billingQuantity, type BillingPreview
 
 export function buildBillingPrintDefinition(document: BillingPrintDocument, format: BillingPrintFormat, options: BillingPreviewOptions = {}): any {
   const ticket = format === 'TICKET';
+  if (document.documentType === 'NOTA_VENTA' && !ticket && !options.example && !options.simulation) return buildCommercialDocument({
+    kind: 'SALE_NOTE', reference: document.internalReference, issuedAt: document.saleDate, total: document.total,
+    company: { name: document.issuer.name, ruc: document.issuer.documentNumber || '', address: document.issuer.address, phone: document.issuerPhone },
+    client: document.receiver, paymentCondition: document.paymentCondition, payments: document.payments,
+    cancelled: document.status === 'DISCARDED', items: document.items.map(item => ({ description: item.description, quantity: item.quantity, unit: item.unit, unitPrice: item.unitPrice, subtotal: item.total, taxType: item.taxType, taxRate: item.taxRate })),
+  });
   const view = billingPresentation(document, options);
   const totalRows = [
     ...(!ticket || document.taxableAmount > 0 ? [['Op. gravadas', billingMoney(document.taxableAmount)]] : []),

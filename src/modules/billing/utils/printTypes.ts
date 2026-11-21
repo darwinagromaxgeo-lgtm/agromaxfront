@@ -6,5 +6,7 @@ export type SaleNotePrintDocument = Omit<BillingDocument, 'documentType' | 'taxT
   documentType: 'NOTA_VENTA';
   taxType: BillingTaxType | 'MIXTO';
   internalReference: string;
+  payments?: { paymentMethodName: string; amount: number }[];
+  issuerPhone?: string;
 };
 export type BillingPrintDocument = BillingDocument | SaleNotePrintDocument | BillingCreditNote;

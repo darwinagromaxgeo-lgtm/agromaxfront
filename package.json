@@ -14,7 +14,8 @@
     "prebuild": "node scripts/sync-brand-assets.cjs",
     "brand:sync": "node scripts/sync-brand-assets.cjs",
     "test:pwa": "node --test tests/pwa.test.mjs",
-    "test:accounting": "node --test tests/accounting-access.test.mjs tests/seller-views.test.mjs"
+    "test:accounting": "node --test tests/accounting-access.test.mjs tests/seller-views.test.mjs",
+    "test:commercial-documents": "node --test tests/commercial-documents.test.mjs tests/bank-accounts-settings.test.mjs tests/billing-pdf.test.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.0",
