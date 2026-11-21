@@ -11,11 +11,19 @@ function errorMessage(error: any, fallback: string) {
   return Array.isArray(message) ? message[0] : message || fallback;
 }
 
-export function useStockAvailability(productId: string, companyId: string) {
+export function useStockAvailabilityBranches(companyId: string, currentBranchId: string) {
   return useQuery({
-    queryKey: ['stock-availability', productId, companyId],
+    queryKey: ['stock-availability-branches', companyId, currentBranchId],
+    queryFn: () => stockRequestService.getBranches(companyId),
+    enabled: Boolean(companyId && currentBranchId),
+  });
+}
+
+export function useStockAvailability(productId: string, companyId: string, currentBranchId: string) {
+  return useQuery({
+    queryKey: ['stock-availability', productId, companyId, currentBranchId],
     queryFn: () => stockRequestService.getAvailability(productId, companyId),
-    enabled: Boolean(productId && companyId),
+    enabled: Boolean(productId && companyId && currentBranchId),
   });
 }
 

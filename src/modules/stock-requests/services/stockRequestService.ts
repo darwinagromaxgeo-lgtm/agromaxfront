@@ -2,6 +2,7 @@ import { api } from '../../../shared/services/api';
 import type {
   PaginatedResponse,
   StockAvailability,
+  StockConsultationBranch,
   StockRequest,
   StockRequestStatus,
 } from '../../../shared/types';
@@ -21,6 +22,8 @@ export interface CreateStockRequestPayload {
 }
 
 export const stockRequestService = {
+  getBranches: (companyId: string) => api.get('/stock/branches', { params: { companyId } })
+    .then(response => response.data.data as StockConsultationBranch[]),
   getAvailability: (productId: string, companyId: string) =>
     api.get(`/stock/availability/${productId}`, { params: { companyId } })
       .then((response) => response.data.data as StockAvailability),

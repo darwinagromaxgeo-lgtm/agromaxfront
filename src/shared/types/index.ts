@@ -10,6 +10,7 @@ export interface Company { id: string; name: string; ruc: string; address?: stri
 export interface PriceTier { id: string; name: string; description?: string; priority: number; isActive: boolean; }
 export interface Stock { id: string; productId: string; companyId: string; branchId?: string; quantity: number; lastUpdated: string; }
 export interface BranchAvailabilityPrice { priceTierId: string; price: number; }
+export interface StockConsultationBranch { branchId: string; branchCode: string; branchName: string; isCurrent: boolean; }
 export interface BranchAvailability {
   branchId: string;
   branchCode: string;

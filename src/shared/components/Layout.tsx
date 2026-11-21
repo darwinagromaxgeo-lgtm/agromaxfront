@@ -190,7 +190,7 @@ export function Layout() {
                 <div className="space-y-0.5">
                   {visibleItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = location.pathname.startsWith(item.path);
+                    const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
                     return (
                       <Link
                         key={item.path}
@@ -372,7 +372,7 @@ export function Layout() {
             {bottomNav.map(({ path, label, icon: Icon }) => {
               const isActive = path === '/dashboard'
                 ? location.pathname === path || location.pathname === '/'
-                : location.pathname.startsWith(path);
+                : location.pathname === path || location.pathname.startsWith(path + '/');
 
               if (path === '/pos') {
                 return (

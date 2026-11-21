@@ -33,6 +33,7 @@ import {
   useReceiveStockRequest,
   useRejectStockRequest,
   useStockAvailability,
+  useStockAvailabilityBranches,
   useStockRequests,
 } from '../hooks/useStockRequests';
 
@@ -77,6 +78,7 @@ export function StockRequestsPage() {
   const [mainTab, setMainTab] = useState<MainTab>('availability');
   const [companyId, setCompanyId] = useState('');
   const [productId, setProductId] = useState('');
+  const [consultedBranchId, setConsultedBranchId] = useState('');
   const [direction, setDirection] = useState<DirectionFilter>('all');
   const [status, setStatus] = useState<StockRequestStatus | ''>('');
   const [requestSource, setRequestSource] = useState<BranchAvailability | null>(null);
@@ -105,7 +107,16 @@ export function StockRequestsPage() {
     setCompanyId(preferred?.id || branchCompanies[0]?.id || '');
   }, [branchCompanies, companyId, selectedBranch]);
 
-  const availability = useStockAvailability(productId, companyId);
+  const branchOptions = useStockAvailabilityBranches(companyId, selectedBranch?.id || '');
+  const availability = useStockAvailability(productId, companyId, selectedBranch?.id || '');
+  const consultationBranches = branchOptions.data || [];
+  const visibleBranches = consultationBranches.filter(branch => !consultedBranchId || branch.branchId === consultedBranchId);
+  const visibleAvailability = availability.data?.branches.filter(branch => !consultedBranchId || branch.branchId === consultedBranchId) || [];
+
+  useEffect(() => {
+    setConsultedBranchId('');
+    setRequestSource(null);
+  }, [companyId, selectedBranch?.id]);
   const requests = useStockRequests({
     direction: direction === 'all' ? undefined : direction,
     status: status || undefined,
@@ -226,10 +237,11 @@ export function StockRequestsPage() {
 
       {mainTab === 'availability' && (
         <div>
-          <div className="mb-5 grid gap-4 border-b border-gray-200 bg-white p-4 shadow-sm md:grid-cols-2 rounded-lg">
+          <div className="mb-5 grid gap-4 border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-3 rounded-lg">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold uppercase text-gray-500">Empresa</span>
-              <select
+              <span className="mb-1.5 block text-xs font-semibold uppercase text-gray-500">Empresa / RUC</span>
+              {branchCompanies.length === 1 ? <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">{branchCompanies[0].name}</div> : <select
+                aria-label="Empresa"
                 value={companyId}
                 onChange={(event) => setCompanyId(event.target.value)}
                 className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
@@ -237,6 +249,14 @@ export function StockRequestsPage() {
                 {branchCompanies.map((company) => (
                   <option key={company.id} value={company.id}>{company.name}</option>
                 ))}
+              </select>}
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold uppercase text-gray-500">Sucursal a consultar</span>
+              <select aria-label="Sucursal a consultar" value={consultedBranchId} onChange={event => setConsultedBranchId(event.target.value)} disabled={branchOptions.isLoading || !companyId}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100">
+                <option value="">Todas las sucursales</option>
+                {consultationBranches.map(branch => <option key={branch.branchId} value={branch.branchId}>{branch.branchName}{branch.isCurrent ? ' (actual)' : ''}</option>)}
               </select>
             </label>
             <label className="block">
@@ -251,11 +271,25 @@ export function StockRequestsPage() {
             </label>
           </div>
 
-          {!productId && (
-            <div className="border border-dashed border-gray-300 bg-white px-5 py-12 text-center rounded-lg">
-              <PackageSearch size={32} className="mx-auto mb-3 text-gray-300" />
-              <p className="text-sm font-medium text-gray-600">Selecciona un producto</p>
-              <p className="mt-1 text-xs text-gray-400">Verás su stock y precio en cada sucursal.</p>
+          {branchOptions.isLoading && <p className="py-6 text-sm text-gray-500">Cargando sucursales...</p>}
+          {branchOptions.isError && <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            No se pudieron cargar las sucursales. <button type="button" onClick={() => branchOptions.refetch()} className="font-semibold underline">Volver a intentar</button>
+          </div>}
+
+          {!productId && consultationBranches.length > 0 && (
+            <div>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium text-gray-700">{consultationBranches.length} sucursales disponibles</p>
+                <p className="text-xs text-gray-500">Selecciona un producto para consultar sus cantidades y precios.</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {visibleBranches.map(branch => <div key={branch.branchId} data-branch-id={branch.branchId} className={`rounded-xl border p-4 ${branch.isCurrent ? 'border-primary-200 bg-primary-50' : 'border-gray-200 bg-white'}`}>
+                  <div className="flex items-center gap-2"><Building2 size={18} className="shrink-0 text-gray-400" /><span className="font-semibold text-gray-800">{branch.branchName}</span>
+                    {branch.isCurrent && <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-semibold text-primary-700">Actual</span>}
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">Stock y precios al seleccionar un producto</p>
+                </div>)}
+              </div>
             </div>
           )}
 
@@ -269,7 +303,7 @@ export function StockRequestsPage() {
             </div>
           )}
 
-          {availability.data && (
+          {productId && availability.data && (
             <div className="overflow-hidden border border-gray-200 bg-white shadow-sm rounded-lg">
               <div className="flex flex-col gap-1 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -277,14 +311,15 @@ export function StockRequestsPage() {
                   <div className="text-xs text-gray-500">Unidad: {availability.data.unit}</div>
                 </div>
                 <div className="text-xs text-gray-500">
-                  {availability.data.branches.filter((branch) => branch.quantity > 0).length} sucursales con stock
+                  {visibleAvailability.length} de {availability.data.branches.length} sucursales · {availability.data.branches.filter((branch) => branch.quantity > 0).length} con stock
                 </div>
               </div>
 
               <div className="divide-y divide-gray-100">
-                {availability.data.branches.map((branch) => (
+                {visibleAvailability.map((branch) => (
                   <div
                     key={branch.branchId}
+                    data-branch-id={branch.branchId}
                     className={`grid gap-3 px-4 py-4 md:grid-cols-[minmax(180px,1fr)_120px_minmax(180px,1fr)_120px] md:items-center ${
                       branch.isCurrent ? 'bg-primary-50/60' : ''
                     }`}

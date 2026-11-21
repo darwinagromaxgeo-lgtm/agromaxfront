@@ -9,7 +9,7 @@
     "test:security": "node --test --test-isolation=none tests/excel-compatibility.test.mjs",
     "test:billing": "node --test tests/billing-pdf.test.mjs tests/pos-billing.test.mjs tests/sales-billing.test.mjs",
     "test:checkout": "node --test tests/credit-checkout.test.mjs tests/pos-billing.test.mjs",
-    "test:stock": "node --test tests/stock-adjustments.test.mjs tests/stock-modals.test.mjs",
+    "test:stock": "node --test tests/stock-adjustments.test.mjs tests/stock-modals.test.mjs tests/stock-availability.test.mjs",
     "preview": "vite preview",
     "prebuild": "node scripts/sync-brand-assets.cjs",
     "brand:sync": "node scripts/sync-brand-assets.cjs",
