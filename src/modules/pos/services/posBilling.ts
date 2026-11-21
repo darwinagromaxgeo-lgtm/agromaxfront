@@ -11,6 +11,8 @@ export async function emitCheckoutDocuments(saleId: string, documentType: Billin
   if (!groups.length || (expectedTotal !== undefined && groups.reduce((sum, group) => sum + Math.round(group.total * 100), 0) !== Math.round(expectedTotal * 100))) throw new Error('Los grupos del comprobante no coinciden con el total de la venta. Revisa su detalle.');
   let documents = await checkoutDocuments(saleId);
   onProgress(documents);
+  const blocked = groups.filter(group => group.billingEnabled === false && !documents.some(document => document.companyId === group.companyId && document.taxType === group.taxType && document.status !== 'DRAFT'));
+  if (blocked.length) throw new Error(`Hay productos no habilitados para boletas ni facturas: ${blocked.flatMap(group => group.blockedProducts || []).join(', ')}. Se permite nota de venta.`);
   for (const group of groups) {
     let document = documents.find(item => item.companyId === group.companyId && item.taxType === group.taxType);
     if (!document) {

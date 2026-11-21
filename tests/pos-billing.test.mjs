@@ -95,3 +95,19 @@ test('credit checkout prepares documents without sending them', async () => {
   assert.equal(result.length, 2); assert.ok(result.every(document => document.status === 'DRAFT'));
   assert.equal(f.calls.issued.length, 0); assert.equal(f.calls.queried.length, 0);
 });
+
+
+test('checkout checks every group before creating or issuing any document', async () => {
+  const f = fixture();
+  f.service.groups = async () => [groups[0], { ...groups[1], billingEnabled: false, blockedProducts: ['Solo nota de venta'] }];
+  await assert.rejects(f.emitCheckoutDocuments('sale', 'FACTURA', receiver, () => {}, true, 2), /no habilitados/);
+  assert.equal(f.calls.created, 0); assert.equal(f.calls.issued.length, 0);
+});
+
+test('product restrictions do not prevent retrieving already accepted documents', async () => {
+  const initial = groups.map((group, index) => ({ ...group, id: String(index), documentType: 'FACTURA', status: 'ACCEPTED', receiver }));
+  const f = fixture(initial);
+  f.service.groups = async () => groups.map(group => ({ ...group, billingEnabled: false }));
+  assert.equal((await f.emitCheckoutDocuments('sale', 'FACTURA', receiver, () => {}, true, 2)).length, 2);
+  assert.equal(f.calls.created, 0); assert.equal(f.calls.issued.length, 0);
+});

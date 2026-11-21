@@ -157,7 +157,7 @@ export function BillingPage() {
   const sales = useQuery<{ data: Sale[]; total: number }>({ queryKey: ['billing-sales', branchId, salePage, startDate, endDate], queryFn: () => saleService.getAll({ page: salePage, limit: 20, startDate: startDate || undefined, endDate: endDate || undefined }), enabled: allowed && !readOnly && createOpen });
   const groups = useQuery({ queryKey: ['billing-groups', branchId, saleId], queryFn: () => billingService.groups(saleId), enabled: allowed && !readOnly && createOpen && !!saleId, retry: false });
   const group = groups.data?.find(item => `${item.companyId}:${item.taxType}` === groupKey);
-  useEffect(() => { if (!groupKey && groups.data?.length) setGroupKey(`${groups.data[0].companyId}:${groups.data[0].taxType}`); }, [groupKey, groups.data]);
+  useEffect(() => { if (!groupKey) { const eligible = groups.data?.find(item => item.billingEnabled !== false); if (eligible) setGroupKey(`${eligible.companyId}:${eligible.taxType}`); } }, [groupKey, groups.data]);
   const saleReceiver = useQuery({ queryKey: ['billing-sale-receiver', branchId, saleId], queryFn: () => billingService.saleReceiver(saleId), enabled: allowed && !readOnly && createOpen && !!saleId });
   useEffect(() => {
     if (!saleReceiver.data || recipientTouched) return;
@@ -165,7 +165,7 @@ export function BillingPage() {
     setRecipient(recipientFormFromParty(saleReceiver.data, selected?.voucherType === 'FACTURA' ? 'FACTURA' : 'BOLETA'));
   }, [saleReceiver.data, saleId, recipientTouched, sales.data]);
   const recipientError = recipientFormError(recipient, group?.total || 0);
-  const draftInput: BillingDraftInput | null = group && !recipientError ? { saleId, companyId: group.companyId, taxType: group.taxType, documentType, receiver: recipientParty(recipient) } : null;
+  const draftInput: BillingDraftInput | null = group && group.billingEnabled !== false && !recipientError ? { saleId, companyId: group.companyId, taxType: group.taxType, documentType, receiver: recipientParty(recipient) } : null;
   const preview = useQuery({ queryKey: ['billing-preview', branchId, draftInput], queryFn: () => billingService.preview(draftInput!), enabled: allowed && !readOnly && createOpen && !!draftInput, retry: false });
   const detail = useQuery({ queryKey: ['billing-detail', branchId, detailId], queryFn: () => billingService.get(detailId!), enabled: allowed && !!detailId });
   const document = detail.data;
@@ -221,7 +221,8 @@ export function BillingPage() {
         <label className="block text-sm font-medium">Venta de origen<select className={`${inputClass} mt-1`} value={saleId} onChange={event => { const selected = sales.data?.data.find(sale => sale.id === event.target.value); setSaleId(event.target.value); setGroupKey(''); setRecipientTouched(false); setRecipient(recipientFormFromParty(undefined, selected?.voucherType === 'FACTURA' ? 'FACTURA' : 'BOLETA')); }}><option value="">Selecciona una venta</option>{sales.data?.data.filter(sale => !sale.isCancelled).map(sale => <option key={sale.id} value={sale.id}>{date(sale.date)} · {sale.id.slice(-8).toUpperCase()} · {money(sale.total)}{sale.isCredit ? ' · Crédito' : ''}</option>)}</select></label>
         {sales.error && <p className="text-sm text-red-700">{apiError(sales.error)}</p>}
         <Pagination page={salePage} totalPages={Math.ceil((sales.data?.total || 0) / 20)} onPageChange={value => { setSalePage(value); setSaleId(''); setGroupKey(''); }} />
-        <div className="grid sm:grid-cols-2 gap-3"><label className="text-sm font-medium">Empresa y afectación<select className={`${inputClass} mt-1`} value={groupKey} disabled={!saleId || groups.isLoading} onChange={event => setGroupKey(event.target.value)}><option value="">Selecciona un grupo</option>{groups.data?.map(item => <option key={`${item.companyId}:${item.taxType}`} value={`${item.companyId}:${item.taxType}`}>{item.companyName} · {taxes[item.taxType]} · {money(item.total)}</option>)}</select></label></div>
+        <div className="grid sm:grid-cols-2 gap-3"><label className="text-sm font-medium">Empresa y afectación<select className={`${inputClass} mt-1`} value={groupKey} disabled={!saleId || groups.isLoading} onChange={event => setGroupKey(event.target.value)}><option value="">Selecciona un grupo</option>{groups.data?.map(item => <option key={`${item.companyId}:${item.taxType}`} value={`${item.companyId}:${item.taxType}`} disabled={item.billingEnabled === false}>{item.billingEnabled === false ? 'No habilitado · ' : ''}{item.companyName} · {taxes[item.taxType]} · {money(item.total)}</option>)}</select></label></div>
+        {groups.data?.some(item => item.billingEnabled === false) && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Los grupos con productos de solo nota de venta no permiten boletas ni facturas: {groups.data.filter(item => item.billingEnabled === false).flatMap(item => item.blockedProducts || []).join(', ')}.</p>}
         {groups.error && <p className="text-sm text-red-700">{apiError(groups.error)}</p>}
         {saleId && <BillingRecipientForm key={`${branchId}:${saleId}`} value={recipient} onChange={next => { setRecipientTouched(true); setRecipient(next); }} total={group?.total || 0} disabled={saleReceiver.isFetching && !recipientTouched} />}
         {preview.isFetching && draftInput && <p className="text-sm text-gray-500 flex gap-2 items-center"><Loader2 className="animate-spin" size={15} /> Preparando detalle…</p>}

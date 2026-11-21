@@ -15,7 +15,8 @@
     "brand:sync": "node scripts/sync-brand-assets.cjs",
     "test:pwa": "node --test tests/pwa.test.mjs",
     "test:accounting": "node --test tests/accounting-access.test.mjs tests/seller-views.test.mjs",
-    "test:commercial-documents": "node --test tests/commercial-documents.test.mjs tests/bank-accounts-settings.test.mjs tests/billing-pdf.test.mjs"
+    "test:commercial-documents": "node --test tests/commercial-documents.test.mjs tests/bank-accounts-settings.test.mjs tests/billing-pdf.test.mjs",
+    "test:product-billing": "node --test tests/product-billing.test.mjs tests/pos-billing.test.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.0",

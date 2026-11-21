@@ -1,3 +1,4 @@
+import { restrictedBillingProducts } from '../../../shared/utils/productBilling';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useProducts } from '../../products/hooks/useProducts';
 import { useCategories } from '../../categories/hooks/useCategories';
@@ -54,6 +55,7 @@ interface CartItem {
   name: string;
   unit: string;
   taxType?: 'GRAVADO' | 'EXONERADO' | 'INAFECTO';
+  billingEnabled?: boolean;
   quantity: number;
   unitPrice: number;
   imageUrl?: string;
@@ -230,7 +232,9 @@ export function POSPage() {
   const billingConnection = useQuery({ queryKey: ['billing-connection', selectedBranch?.id], queryFn: billingService.status, enabled: showCheckout && voucherType !== 'NONE', retry: false, staleTime: 15_000 });
   const fiscalStatus = billingConnection.data;
   const issuerMatchesCompany = !!fiscalStatus?.issuerRuc && fiscalStatus.issuerRuc === companies.find(company => company.id === companyId)?.ruc;
-  const fiscalBlockReason = !fiscalStatus
+  const restrictedProducts = restrictedBillingProducts(cart, allProducts);
+  const productBillingError = restrictedProducts.length ? `Solo nota de venta: ${[...new Set(restrictedProducts.map(item => item.name))].join(', ')}. Estos productos no están habilitados para boletas ni facturas.` : undefined;
+  const fiscalBlockReason = productBillingError || (!fiscalStatus
     ? billingConnection.isFetching ? 'Comprobando facturador…' : 'No se pudo conectar con el facturador. Vuelve a comprobar la conexión.'
     : !fiscalStatus.ready ? fiscalStatus.message
     : !issuerMatchesCompany ? `Selecciona la empresa del RUC ${fiscalStatus.issuerRuc} en el POS. El facturador está configurado para ese emisor.`
@@ -238,9 +242,9 @@ export function POSPage() {
       ? voucherType === 'BOLETA' && fiscalStatus.message.includes('resumen diario')
         ? `Boleta ${fiscalStatus.series?.BOLETA || ''}: envío pendiente. La serie ya está configurada; falta coordinar la numeración de los resúmenes RC con el otro software del RUC.`
         : fiscalStatus.message
-      : undefined;
+      : undefined);
   const fiscalReady = !fiscalBlockReason;
-  const canSwitchToFactura = voucherType === 'BOLETA' && fiscalStatus?.ready && issuerMatchesCompany && fiscalStatus.supportedDocumentTypes.includes('FACTURA');
+  const canSwitchToFactura = !productBillingError && voucherType === 'BOLETA' && fiscalStatus?.ready && issuerMatchesCompany && fiscalStatus.supportedDocumentTypes.includes('FACTURA');
   const selectedParty = (id: string) => { const client = clients.find(item => item.id === id); const number = client?.documentNumber || ''; return client ? { name: client.name, documentType: (number.length === 11 ? 'RUC' : number.length === 8 ? 'DNI' : 'UNIDENTIFIED') as BillingParty['documentType'], documentNumber: number || undefined, address: client.address, email: client.email } : undefined; };
   const selectCheckoutClient = (client: Client | undefined) => {
     setClientId(client?.id || '');
@@ -252,7 +256,7 @@ export function POSPage() {
       setRecipient(recipientFormFromParty(client ? { name: client.name, documentType: number.length === 11 ? 'RUC' : number.length === 8 ? 'DNI' : 'UNIDENTIFIED', documentNumber: number || undefined, address: client.address, email: client.email } : undefined, voucherType));
     }
   };
-  const chooseVoucher = (value: 'NONE' | 'BOLETA' | 'FACTURA') => { setVoucherType(value); if (value !== 'NONE') setRecipient(recipientFormFromParty(selectedParty(clientId), value)); };
+  const chooseVoucher = (value: 'NONE' | 'BOLETA' | 'FACTURA') => { if (value !== 'NONE' && productBillingError) { toast.error(productBillingError); return; } setVoucherType(value); if (value !== 'NONE') setRecipient(recipientFormFromParty(selectedParty(clientId), value)); };
   const closeCheckout = () => { if (checkoutBusy) return; setShowCheckout(false); setCheckoutResult(null); };
   const billingError = (error: any) => { const message = error?.response?.data?.message; return Array.isArray(message) ? message.join(' ') : typeof message === 'string' ? message : error?.message || 'No se pudo confirmar la emisión. Actualiza su resultado.'; };
   const updateResultDocuments = (documents: BillingDocument[]) => {
@@ -338,6 +342,7 @@ export function POSPage() {
         name: p?.name || '—',
         unit: p?.unit || '',
         taxType: cartTaxType(p?.taxType),
+        billingEnabled: p?.billingEnabled ?? i.billingEnabled,
         quantity: i.quantity,
         unitPrice: i.unitPrice,
         tierOverride: i.priceTier,
@@ -453,6 +458,7 @@ export function POSPage() {
           name: product.name,
           unit: product.unit,
           taxType: cartTaxType(product.taxType),
+          billingEnabled: product.billingEnabled,
           quantity: 1,
           unitPrice: price,
           imageUrl: product.imageUrl,
@@ -477,6 +483,7 @@ export function POSPage() {
         name: lotSelectorProduct.name,
         unit: lotSelectorProduct.unit,
         taxType: cartTaxType(lotSelectorProduct.taxType),
+        billingEnabled: lotSelectorProduct.billingEnabled,
         quantity: 1,
         unitPrice: price,
         imageUrl: lotSelectorProduct.imageUrl,
@@ -612,6 +619,7 @@ export function POSPage() {
     if (checkoutLock.current || showNewClient) return;
     const receiver = voucherType === 'NONE' ? undefined : recipientParty(recipient);
     if (voucherType !== 'NONE') {
+      if (productBillingError) { toast.error(productBillingError); return; }
       const error = recipientFormError(recipient, total); if (error) { toast.error(error); return; }
       if (!isCredit && !fiscalReady) { toast.error(fiscalBlockReason || 'Verifica la conexión del facturador'); return; }
     }
@@ -918,6 +926,7 @@ export function POSPage() {
                         {/* Nombre + stock + precio */}
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-gray-800 truncate leading-snug">{p.name}</div>
+                          {p.billingEnabled === false && <span className="text-[11px] font-medium text-amber-800">Solo nota de venta</span>}
                           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${isOutOfStock ? 'bg-red-50 text-red-600' : stock <= 10 ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
                               {isOutOfStock ? 'Agotado' : `Stock: ${stock}`}
@@ -1622,6 +1631,8 @@ export function POSPage() {
                     <button
                       key={v}
                       onClick={() => chooseVoucher(v)}
+                      disabled={checkoutBusy || (v !== 'NONE' && !!productBillingError)}
+                      title={v !== 'NONE' ? productBillingError : undefined}
                       className={`py-3 rounded-xl text-sm font-semibold transition-colors border-2 ${
                         voucherType === v
                           ? 'bg-primary-600 text-white border-primary-600 shadow-sm'
@@ -1636,6 +1647,7 @@ export function POSPage() {
 
               <div className="border-t border-gray-100" />
 
+              {productBillingError && <p role="alert" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{productBillingError} Puedes guardar una cotización o vender con nota de venta.</p>}
               {voucherType !== 'NONE' && <BillingRecipientForm value={recipient} onChange={setRecipient} total={total} documentType={voucherType} disabled={checkoutBusy} heading={voucherType === 'FACTURA' ? 'Receptor de la factura' : 'Receptor de la boleta'} />}
               {/* 3. Tipo de pago */}
               <div>
@@ -1851,7 +1863,7 @@ export function POSPage() {
               <button
                 onClick={confirmSale}
                 aria-describedby={voucherType !== 'NONE' && !isCredit && !fiscalReady ? 'checkout-fiscal-block' : undefined}
-                disabled={checkoutBusy || showNewClient || (isCredit && !!creditPayment.error) || (voucherType !== 'NONE' && (!!recipientFormError(recipient, total) || (!isCredit && !fiscalReady)))}
+                disabled={checkoutBusy || showNewClient || (isCredit && !!creditPayment.error) || (voucherType !== 'NONE' && (!!productBillingError || !!recipientFormError(recipient, total) || (!isCredit && !fiscalReady)))}
                 className={`w-full py-4 text-white rounded-xl disabled:opacity-50 font-bold text-lg transition-colors shadow-sm flex items-center justify-center gap-2 ${
                   isCredit ? 'bg-orange-500 hover:bg-orange-600' : 'bg-primary-600 hover:bg-primary-700'
                 }`}

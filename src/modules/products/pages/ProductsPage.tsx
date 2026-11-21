@@ -19,6 +19,7 @@ import { stockService } from '../../stock/services/stockService';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import type { Product } from '../../../shared/types';
+import { parseBillingEnabled } from '../../../shared/utils/productBilling';
 import { useAuth } from '../../../app/providers/AuthProvider';
 
 const TAX_TYPES = [
@@ -34,6 +35,7 @@ interface BulkProduct {
   categoryId: string;
   unit: string;
   taxType: string;
+  billingEnabled: boolean;
   location: string;
   activeIngredient: string;
   activeIngredients: { name: string; concentration: string }[];
@@ -50,12 +52,13 @@ export function ProductsPage() {
   const page = Number(searchParams.get('page') || '1');
   const activeTab = (searchParams.get('tab') || 'active') as 'active' | 'inactive';
   const sortOrder = (searchParams.get('sort') || '') as '' | 'asc' | 'desc';
+  const billingFilter = searchParams.get('billing') || '';
   const unitFilter = searchParams.get('unit') || '';
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [activeIngredientFilter, setActiveIngredientFilter] = useState(searchParams.get('ing') || '');
   const [supplierFilter, setSupplierFilter] = useState(searchParams.get('sup') || '');
   const [showFilters, setShowFilters] = useState(
-    !!(searchParams.get('ing') || searchParams.get('sup') || searchParams.get('unit') || searchParams.get('sort'))
+    !!(searchParams.get('ing') || searchParams.get('sup') || searchParams.get('unit') || searchParams.get('sort') || searchParams.get('billing'))
   );
   const debouncedSearch = useDebounce(search);
   const debouncedIngredient = useDebounce(activeIngredientFilter);
@@ -79,7 +82,7 @@ export function ProductsPage() {
   const [lotForm, setLotForm] = useState({ companyId: '', lotNumber: '', expirationDate: '', quantity: '' });
 
   const queryClient = useQueryClient();
-  const { data, isLoading } = useProducts({ page, limit: 20, search: debouncedSearch, activeIngredient: debouncedIngredient || undefined, isActive: activeTab === 'active', supplier: debouncedSupplier || undefined, unit: unitFilter || undefined, sort: sortOrder || undefined });
+  const { data, isLoading } = useProducts({ page, limit: 20, search: debouncedSearch, activeIngredient: debouncedIngredient || undefined, isActive: activeTab === 'active', supplier: debouncedSupplier || undefined, unit: unitFilter || undefined, sort: sortOrder || undefined, billingEnabled: billingFilter ? billingFilter === 'true' : undefined });
   const { data: priceTiers } = usePriceTiers();
   const { data: categories } = useCategories();
   const { data: companies } = useCompanies();
@@ -127,7 +130,7 @@ export function ProductsPage() {
     return map;
   }, [activeBranchCompanies, stockQueries]);
 
-  const [form, setForm] = useState({ name: '', description: '', categoryId: '', unit: '', activeIngredient: '', activeIngredients: [] as { name: string; concentration: string }[], taxType: 'GRAVADO', tracksLot: false, location: '', supplier: '', control: '', cultivo: '', dosis: '', prices: [] as { priceTierId: string; companyId?: string; branchId?: string; price: number }[], initialStocks: [] as { companyId: string; quantity: number }[] });
+  const [form, setForm] = useState({ name: '', description: '', categoryId: '', unit: '', activeIngredient: '', activeIngredients: [] as { name: string; concentration: string }[], taxType: 'GRAVADO', billingEnabled: true, tracksLot: false, location: '', supplier: '', control: '', cultivo: '', dosis: '', prices: [] as { priceTierId: string; companyId?: string; branchId?: string; price: number }[], initialStocks: [] as { companyId: string; quantity: number }[] });
   const [selectedParentCatId, setSelectedParentCatId] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [suppliersTarget, setSuppliersTarget] = useState<Product | null>(null);
@@ -192,15 +195,15 @@ export function ProductsPage() {
     }, { replace: true });
   }, [debouncedSupplier]);
 
-  const emptyBulkProduct = (): BulkProduct => ({ name: '', description: '', categoryId: '', unit: '', taxType: 'GRAVADO', location: '', activeIngredient: '', activeIngredients: [], tracksLot: false, prices: [], initialStocks: [], expanded: true });
+  const emptyBulkProduct = (): BulkProduct => ({ name: '', description: '', categoryId: '', unit: '', taxType: 'GRAVADO', billingEnabled: true, location: '', activeIngredient: '', activeIngredients: [], tracksLot: false, prices: [], initialStocks: [], expanded: true });
 
 
-  const openCreate = () => { setEditing(null); setSelectedParentCatId(''); setForm({ name: '', description: '', categoryId: '', unit: allUnits[0]?.value || '', activeIngredient: '', activeIngredients: [], taxType: 'GRAVADO', tracksLot: false, location: '', supplier: '', control: '', cultivo: '', dosis: '', prices: [], initialStocks: [] }); setShowModal(true); };
+  const openCreate = () => { setEditing(null); setSelectedParentCatId(''); setForm({ name: '', description: '', categoryId: '', unit: allUnits[0]?.value || '', activeIngredient: '', activeIngredients: [], taxType: 'GRAVADO', billingEnabled: true, tracksLot: false, location: '', supplier: '', control: '', cultivo: '', dosis: '', prices: [], initialStocks: [] }); setShowModal(true); };
   const openEdit = (product: Product) => {
     setEditing(product);
     const cat = cats.find((c: any) => c.id === product.categoryId);
     setSelectedParentCatId(cat?.parentId ? cat.parentId : (cat?.id || ''));
-    setForm({ name: product.name, description: product.description || '', categoryId: product.categoryId, unit: product.unit, activeIngredient: product.activeIngredient || '', activeIngredients: product.activeIngredients?.map(i => ({ name: i.name, concentration: i.concentration || '' })) || [], taxType: product.taxType || 'GRAVADO', tracksLot: product.tracksLot || false, location: product.location || '', supplier: product.supplier || '', control: product.control || '', cultivo: product.cultivo || '', dosis: product.dosis || '', prices: product.prices || [], initialStocks: [] });
+    setForm({ name: product.name, description: product.description || '', categoryId: product.categoryId, unit: product.unit, activeIngredient: product.activeIngredient || '', activeIngredients: product.activeIngredients?.map(i => ({ name: i.name, concentration: i.concentration || '' })) || [], taxType: product.taxType || 'GRAVADO', billingEnabled: product.billingEnabled !== false, tracksLot: product.tracksLot || false, location: product.location || '', supplier: product.supplier || '', control: product.control || '', cultivo: product.cultivo || '', dosis: product.dosis || '', prices: product.prices || [], initialStocks: [] });
     setShowModal(true);
   };
   const openBulk = () => { setBulkProducts([emptyBulkProduct()]); setShowBulkModal(true); };
@@ -212,7 +215,7 @@ export function ProductsPage() {
       const { initialStocks, activeIngredient, ...editData } = form;
       await updateProduct.mutateAsync({ id: editing.id, data: { ...editData, activeIngredients: validIngredients } });
     } else {
-      const payload: any = { name: form.name, description: form.description, categoryId: form.categoryId, unit: form.unit, taxType: form.taxType, tracksLot: form.tracksLot, location: form.location, supplier: form.supplier || undefined, control: form.control || undefined, cultivo: form.cultivo || undefined, dosis: form.dosis || undefined, prices: form.prices, activeIngredients: validIngredients };
+      const payload: any = { name: form.name, description: form.description, categoryId: form.categoryId, unit: form.unit, taxType: form.taxType, billingEnabled: form.billingEnabled, tracksLot: form.tracksLot, location: form.location, supplier: form.supplier || undefined, control: form.control || undefined, cultivo: form.cultivo || undefined, dosis: form.dosis || undefined, prices: form.prices, activeIngredients: validIngredients };
       const validStocks = form.initialStocks.filter(s => s.quantity > 0 && s.companyId);
       if (validStocks.length > 0) payload.initialStocks = validStocks;
       await createProduct.mutateAsync(payload);
@@ -301,7 +304,7 @@ export function ProductsPage() {
     let errors = 0;
     for (const p of valid) {
       try {
-        const payload: any = { name: p.name, description: p.description, categoryId: p.categoryId, unit: p.unit, taxType: p.taxType, prices: p.prices, activeIngredient: p.activeIngredient || undefined, location: p.location || undefined, tracksLot: p.tracksLot };
+        const payload: any = { name: p.name, description: p.description, categoryId: p.categoryId, unit: p.unit, taxType: p.taxType, billingEnabled: p.billingEnabled, prices: p.prices, activeIngredient: p.activeIngredient || undefined, location: p.location || undefined, tracksLot: p.tracksLot };
         const validStocks = p.initialStocks.filter(s => s.quantity > 0 && s.companyId);
         if (validStocks.length > 0) payload.initialStocks = validStocks;
         await createProduct.mutateAsync(payload);
@@ -341,6 +344,7 @@ export function ProductsPage() {
           Cultivo: p.cultivo || '',
           Dosis: p.dosis || '',
           Tipo_IGV: p.taxType || 'GRAVADO',
+          Boletas_Facturas: p.billingEnabled === false ? 'NO' : 'SI',
         };
 
         tiersList.forEach((t: any) => {
@@ -477,7 +481,7 @@ export function ProductsPage() {
             const initialStocks: { companyId: string; quantity: number }[] = [];
             compsList.forEach((c: any) => { const val = row[`Stock_${c.name}`]; if (val && Number(val) > 0) initialStocks.push({ companyId: c.id, quantity: Number(val) }); });
             const rawTaxType = String(row.Tipo_IGV || '').trim().toUpperCase();
-            return { name: String(row.Nombre || ''), description: String(row.Descripcion || ''), categoryId: cat?.id || '', unit: String(row.Unidad || ''), taxType: ['GRAVADO', 'EXONERADO', 'INAFECTO'].includes(rawTaxType) ? rawTaxType : 'GRAVADO', location: String(row.Ubicacion || '').trim(), activeIngredient: String(row.IngredienteActivo || '').trim(), activeIngredients: [], tracksLot: false, prices, initialStocks, expanded: false };
+            return { name: String(row.Nombre || ''), description: String(row.Descripcion || ''), categoryId: cat?.id || '', unit: String(row.Unidad || ''), taxType: ['GRAVADO', 'EXONERADO', 'INAFECTO'].includes(rawTaxType) ? rawTaxType : 'GRAVADO', billingEnabled: parseBillingEnabled(row.Boletas_Facturas), location: String(row.Ubicacion || '').trim(), activeIngredient: String(row.IngredienteActivo || '').trim(), activeIngredients: [], tracksLot: false, prices, initialStocks, expanded: false };
           });
           toast.success(`${imported.length} producto(s) cargados desde Excel`);
           setBulkProducts(imported);
@@ -485,7 +489,7 @@ export function ProductsPage() {
         }
       } catch (err) {
         console.error('Import error:', err);
-        toast.error('Error al leer el archivo. Revisa la consola del navegador para más detalles.');
+        toast.error(err instanceof Error ? err.message : 'Error al leer el archivo');
       }
     };
     reader.readAsBinaryString(file);
@@ -520,7 +524,7 @@ export function ProductsPage() {
     const tiersList = Array.isArray(priceTiers) ? priceTiers : [];
     const catsList = Array.isArray(categories) ? categories : [];
     const compsList = Array.isArray(companies) ? companies : [];
-    const header: any = { Nombre: 'Ejemplo Producto', Descripcion: '', Categoria: catsList[0]?.name || 'Fertilizantes', Unidad: 'kg', IngredienteActivo: '', Ubicacion: '', Tipo_IGV: 'GRAVADO' };
+    const header: any = { Nombre: 'Ejemplo Producto', Descripcion: '', Categoria: catsList[0]?.name || 'Fertilizantes', Unidad: 'kg', IngredienteActivo: '', Ubicacion: '', Tipo_IGV: 'GRAVADO', Boletas_Facturas: 'SI' };
     tiersList.forEach((t: any) => { header[`Precio_${t.name}`] = 0; });
     compsList.forEach((c: any) => { tiersList.forEach((t: any) => { header[`Precio_${c.name}_${t.name}`] = 0; }); });
     compsList.forEach((c: any) => { header[`Stock_${c.name}`] = 0; });
@@ -629,6 +633,7 @@ export function ProductsPage() {
       const colors = item.taxType === 'PENDIENTE' ? 'bg-amber-100 text-amber-800' : item.taxType === 'EXONERADO' ? 'bg-yellow-100 text-yellow-800' : item.taxType === 'INAFECTO' ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800';
       return <span className={`px-2 py-1 rounded-full text-xs ${colors}`}>{t?.label || 'Gravado'}</span>;
     }},
+    { key: 'billingEnabled', header: 'Comprobantes', render: (item: Product) => <span className={`px-2 py-1 rounded-full text-xs ${item.billingEnabled === false ? 'bg-amber-100 text-amber-800' : 'bg-green-50 text-green-800'}`}>{item.billingEnabled === false ? 'Solo nota de venta' : 'Boletas y facturas'}</span> },
     { key: 'prices', header: 'Precios', render: (item: Product) => {
       const displayPrices = getPricesForDisplay(item);
       return (
@@ -707,7 +712,7 @@ export function ProductsPage() {
           >
             <SlidersHorizontal size={15} />
             {(() => {
-              const n = [activeIngredientFilter, supplierFilter, unitFilter, sortOrder, priceCompanyFilter].filter(Boolean).length;
+              const n = [activeIngredientFilter, supplierFilter, unitFilter, sortOrder, priceCompanyFilter, billingFilter].filter(Boolean).length;
               return n > 0 ? <span className={`text-xs font-bold ${showFilters ? 'text-white' : 'text-primary-600'}`}>{n}</span> : null;
             })()}
           </button>
@@ -732,6 +737,11 @@ export function ProductsPage() {
               <option value="">Más reciente</option>
               <option value="asc">Nombre A → Z</option>
               <option value="desc">Nombre Z → A</option>
+            </select>
+            <select aria-label="Habilitación de comprobantes" value={billingFilter} onChange={e => setParams({ billing: e.target.value, page: '' })} className="flex-1 min-w-0 px-3 py-2 border rounded-lg text-sm">
+              <option value="">Todos los comprobantes</option>
+              <option value="true">Boletas y facturas habilitadas</option>
+              <option value="false">Solo nota de venta</option>
             </select>
             {allUnits.length > 0 && (
               <select value={unitFilter} onChange={(e) => setParams({ unit: e.target.value, page: '' })} className="flex-1 min-w-0 px-3 py-2 border rounded-lg text-sm">
@@ -774,6 +784,7 @@ export function ProductsPage() {
               <div className="flex items-start justify-between gap-2 mb-1">
                 <div>
                   <span className="font-semibold text-gray-800 leading-snug">{item.name}</span>
+                  {item.billingEnabled === false && <span className="block text-xs text-amber-800 mt-1">Solo nota de venta</span>}
                   {(() => {
                     const activeCompsList = branchComps;
                     if (!activeCompsList.length) return null;
@@ -993,6 +1004,10 @@ export function ProductsPage() {
             </div>
             <div><label className="block text-sm font-medium text-gray-700 mb-1">Tipo IGV</label><select value={form.taxType} onChange={(e) => setForm({ ...form, taxType: e.target.value })} className="w-full px-3 py-2 border rounded-lg">{TAX_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
           </div>
+          <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 text-sm cursor-pointer">
+            <input type="checkbox" checked={form.billingEnabled} onChange={e => setForm({ ...form, billingEnabled: e.target.checked })} className="mt-1 h-4 w-4 rounded text-primary-600" />
+            <span><span className="font-medium">Habilitado para boletas y facturas</span><span className="block text-xs text-gray-500 mt-1">Al desmarcarlo, el producto podrá usarse en notas de venta y cotizaciones.</span></span>
+          </label>
           {!editing && branchComps.length > 0 && (
             <div className="border border-blue-200 bg-blue-50 rounded-lg p-4 space-y-3">
               <label className="block text-sm font-medium text-blue-800">Stock inicial en {selectedBranch?.name || 'la sucursal actual'} (opcional)</label>
@@ -1299,6 +1314,7 @@ export function ProductsPage() {
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Categoría *</label><select value={bp.categoryId} onChange={(e) => updateBulkProduct(idx, 'categoryId', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm"><option value="">Seleccionar...</option>{cats.filter((c: any) => c.isActive).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Unidad</label><select value={bp.unit} onChange={(e) => updateBulkProduct(idx, 'unit', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm">{allUnits.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}</select></div>
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Tipo IGV</label><select value={bp.taxType} onChange={(e) => updateBulkProduct(idx, 'taxType', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm">{TAX_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}</select></div>
+                    <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={bp.billingEnabled} onChange={e => updateBulkProduct(idx, 'billingEnabled', e.target.checked)} />Habilitado para boletas y facturas</label>
                   </div>
                   {branchComps.length > 0 && (
                     <div><label className="block text-sm font-medium text-gray-700 mb-2">Stock Inicial por Empresa</label>

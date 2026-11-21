@@ -82,7 +82,7 @@ export interface BillingProviderStatus {
   message: string;
 }
 
-export interface BillingGroup { companyId: string; companyName: string; taxType: BillingTaxType; total: number; items: number; }
+export interface BillingGroup { billingEnabled?: boolean; blockedProducts?: string[]; companyId: string; companyName: string; taxType: BillingTaxType; total: number; items: number; }
 export interface BillingDraftInput { saleId: string; companyId: string; documentType: BillingDocumentType; taxType: BillingTaxType; legacyTaxConfirmed?: boolean; receiver?: BillingParty; replacesDocumentId?:string; }
 export interface BillingFilters { page: number; limit: number; companyId?: string; saleId?: string; saleIds?: string[]; documentType?: BillingDocumentType; status?: BillingStatus; startDate?: string; endDate?: string; }
 export interface BillingSimulation {
