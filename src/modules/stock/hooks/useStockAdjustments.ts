@@ -12,6 +12,7 @@ export function useCreateStockAdjustment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['stock-adjustments'] });
       qc.invalidateQueries({ queryKey: ['stock'] });
+      qc.invalidateQueries({ queryKey: ['stock-alerts'] });
       qc.invalidateQueries({ queryKey: ['kardex'] });
       qc.invalidateQueries({ queryKey: ['stock-movements'] });
       qc.invalidateQueries({ queryKey: ['product-lots'] });
@@ -29,6 +30,20 @@ export function useCreateStockAdjustment() {
       };
       const msg = (first && friendly[first]) || (first?.includes('date') ? 'La fecha de vencimiento no es válida' : first) || 'Error al registrar el ajuste';
       toast.error(msg);
+    },
+  });
+}
+
+export function useCreateStockAdjustmentBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: stockAdjustmentService.createBatch,
+    onSuccess: (result) => {
+      for (const key of ['stock-adjustments', 'stock', 'stock-alerts', 'kardex', 'stock-movements', 'product-lots', 'product-lots-expiring', 'stock-availability']) {
+        qc.invalidateQueries({ queryKey: [key] });
+      }
+      const count = result.adjustments.length;
+      toast.success(count === 1 ? 'Stock actualizado' : `${count} productos actualizados`);
     },
   });
 }

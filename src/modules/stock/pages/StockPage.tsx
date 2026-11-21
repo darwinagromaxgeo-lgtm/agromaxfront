@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { Stock, Company, Product, StockAdjustment, ProductLot } from '../../../shared/types';
 import { useAuth } from '../../../app/providers/AuthProvider';
+import { StockAdjustmentModal } from '../components/StockAdjustmentModal';
 
 type ImportRow = { excelName: string; quantity: number; matched: Product | null };
 
@@ -59,7 +60,8 @@ export function StockPage() {
     acc[l.productId].push(l);
     return acc;
   }, {});
-  const [adjForm, setAdjForm] = useState({ productId: '', companyId: '', type: 'INCREASE' as 'INCREASE' | 'DECREASE', quantity: 0, reason: '', lotNumber: '', expirationDate: '' });
+  const [adjustmentPreset, setAdjustmentPreset] = useState({ productId: '', companyId: '' });
+  React.useEffect(() => { setShowAdjustment(false); }, [selectedBranch?.id]);
 
   const companyList = (Array.isArray(companies) ? companies : []).filter((company: Company) =>
     company.isActive
@@ -168,7 +170,7 @@ export function StockPage() {
 
   const openTransfer = () => { setTransferForm({ fromCompanyId: companyId || '', toCompanyId: '', items: [{ productId: '', quantity: 0, lotAllocations: [] }] }); setShowTransfer(true); };
   const openAdjustment = (preset?: { productId?: string; companyId?: string }) => {
-    setAdjForm({ productId: preset?.productId || '', companyId: preset?.companyId || companyId || (companyList[0]?.id || ''), type: 'INCREASE', quantity: 0, reason: '', lotNumber: '', expirationDate: '' });
+    setAdjustmentPreset({ productId: preset?.productId || '', companyId: preset?.companyId || companyId || companyList[0]?.id || '' });
     setShowAdjustment(true);
   };
 
@@ -234,15 +236,6 @@ export function StockPage() {
     await transferStock.mutateAsync(payload);
     setShowTransfer(false);
   };
-  const handleAdjustment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload: any = { ...adjForm };
-    if (!payload.lotNumber) delete payload.lotNumber;
-    if (!payload.expirationDate) delete payload.expirationDate;
-    await createAdjustment.mutateAsync(payload);
-    setShowAdjustment(false);
-  };
-
   const downloadTemplate = () => {
     import('xlsx').then(XLSX => {
       const wb = XLSX.utils.book_new();
@@ -352,7 +345,7 @@ export function StockPage() {
           {activeTab === 'inventory' && (
             <>
               <button onClick={() => openAdjustment()} className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
-                <Plus size={15} /> Ajuste
+                <ClipboardList size={15} /> Ajustar stock
               </button>
               <button onClick={openTransfer} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
                 <ArrowRightLeft size={15} /> Transferir
@@ -814,7 +807,7 @@ export function StockPage() {
                     <div className="font-medium text-gray-800 text-sm leading-snug">{getProductName(item.productId)}</div>
                     <div className="text-xs text-gray-400 mt-0.5">{new Date(item.date).toLocaleDateString('es-PE')} · {getCompanyName(item.companyId)}</div>
                   </div>
-                  {item.type === 'INCREASE'
+                  {item.mode === 'SET' ? <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-semibold border border-blue-200">Cantidad final</span> : item.type === 'INCREASE'
                     ? <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-semibold border border-green-200 flex-shrink-0">Aumento</span>
                     : <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-semibold border border-red-200 flex-shrink-0">Disminución</span>}
                 </div>
@@ -851,7 +844,7 @@ export function StockPage() {
                     <td className="px-4 py-3 text-gray-500 text-xs">{new Date(item.date).toLocaleDateString('es-PE')}</td>
                     <td className="px-4 py-3 font-medium text-gray-800">{getProductName(item.productId)}</td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{getCompanyName(item.companyId)}</td>
-                    <td className="px-4 py-3">{item.type === 'INCREASE' ? <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-semibold border border-green-200">Aumento</span> : <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-semibold border border-red-200">Disminución</span>}</td>
+                    <td className="px-4 py-3">{item.mode === 'SET' ? <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-semibold border border-blue-200">Cantidad final</span> : item.type === 'INCREASE' ? <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-semibold border border-green-200">Aumento</span> : <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-[10px] font-semibold border border-red-200">Disminución</span>}</td>
                     <td className="px-4 py-3 text-right font-semibold text-gray-800">{item.quantity}</td>
                     <td className="px-4 py-3 text-right text-xs text-gray-500">{item.previousQuantity} → <span className="font-semibold text-gray-700">{item.newQuantity}</span></td>
                     <td className="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">{item.reason}</td>
@@ -960,80 +953,15 @@ export function StockPage() {
         </form>
       </Modal>
 
-      {/* ── Modal: Adjustment ── */}
-      <Modal isOpen={showAdjustment} onClose={() => setShowAdjustment(false)} title="Ajuste de Stock">
-        <form onSubmit={handleAdjustment} className="space-y-4">
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
-            <select value={adjForm.companyId} onChange={(e) => setAdjForm({ ...adjForm, companyId: e.target.value })} className="w-full px-3 py-2 border rounded-lg" required>
-              <option value="">Seleccionar...</option>
-              {companyList.map((c: Company) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Producto</label>
-            <SearchableSelect
-              options={allProducts.length > 0 ? allProducts.map((p: Product) => ({ value: p.id, label: p.name })) : products.map((p: Product) => ({ value: p.id, label: p.name }))}
-              value={adjForm.productId}
-              onChange={(v) => setAdjForm({ ...adjForm, productId: v, lotNumber: '', expirationDate: '' })}
-              placeholder="Buscar producto..." required />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-              <select value={adjForm.type} onChange={(e) => setAdjForm({ ...adjForm, type: e.target.value as 'INCREASE' | 'DECREASE' })} className="w-full px-3 py-2 border rounded-lg">
-                <option value="INCREASE">Aumento</option>
-                <option value="DECREASE">Disminución</option>
-              </select>
-            </div>
-            <div><label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
-              <input type="number" min="0.01" step="0.01" value={adjForm.quantity || ''} onChange={(e) => setAdjForm({ ...adjForm, quantity: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border rounded-lg" required />
-            </div>
-          </div>
-
-          {/* Campos de lote — solo para INCREASE en productos con tracksLot */}
-          {adjForm.type === 'INCREASE' && (() => {
-            const prod = allProducts.find((p: Product) => p.id === adjForm.productId) || products.find((p: Product) => p.id === adjForm.productId);
-            if (!prod?.tracksLot) return null;
-            return (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-3">
-                <div className="text-xs font-semibold text-blue-700 flex items-center gap-1.5">
-                  <Boxes size={13} /> Información de lote (opcional)
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Número de lote
-                    </label>
-                    <input
-                      value={adjForm.lotNumber}
-                      onChange={(e) => setAdjForm({ ...adjForm, lotNumber: e.target.value })}
-                      className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white"
-                      placeholder="Escribe el lote existente o deja vacío para crear nuevo"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Fecha de vencimiento</label>
-                    <input
-                      type="date"
-                      value={adjForm.expirationDate}
-                      onChange={(e) => setAdjForm({ ...adjForm, expirationDate: e.target.value })}
-                      className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white"
-                    />
-                  </div>
-                </div>
-                <p className="text-[11px] text-blue-600">
-                  Ingresa el número de lote existente para aumentar su stock, o déjalo vacío para crear un lote nuevo automáticamente.
-                </p>
-              </div>
-            );
-          })()}
-
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Razón</label>
-            <textarea value={adjForm.reason} onChange={(e) => setAdjForm({ ...adjForm, reason: e.target.value })} className="w-full px-3 py-2 border rounded-lg" rows={2} required placeholder="Motivo del ajuste..." />
-          </div>
-          <button type="submit" disabled={createAdjustment.isPending} className="w-full py-2.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 font-medium text-sm">
-            {createAdjustment.isPending ? 'Registrando...' : 'Registrar Ajuste'}
-          </button>
-        </form>
-      </Modal>
+      {showAdjustment && <StockAdjustmentModal
+        key={selectedBranch?.id}
+        companies={companyList}
+        products={allProducts.length > 0 ? allProducts : products}
+        companyId={adjustmentPreset.companyId}
+        productId={adjustmentPreset.productId}
+        branchName={selectedBranch?.name || 'Sucursal activa'}
+        onClose={() => setShowAdjustment(false)}
+      />}
 
       {/* ── Modal: Import Excel ── */}
       <Modal isOpen={showImportModal} onClose={() => { setShowImportModal(false); setImportRows([]); if (importFileRef.current) importFileRef.current.value = ''; }} title="Importar Stock desde Excel" size="lg">
