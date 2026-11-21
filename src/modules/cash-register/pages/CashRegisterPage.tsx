@@ -380,7 +380,7 @@ export function CashRegisterPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={filters.showDeleted} onChange={e => setFilters({ ...filters, showDeleted: e.target.checked })} /> Mostrar anulados</label>
           <span className="text-xs text-gray-500">{filteredEntries.length} de {entries.length} movimientos · El resumen superior incluye todos los activos.</span>
-          <button onClick={() => downloadMovements(filteredEntries, register.date)} disabled={!filteredEntries.length} className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-50"><Download size={15} /> Exportar CSV</button>
+          <button onClick={() => downloadMovements(filteredEntries, register.date)} disabled={!filteredEntries.length} className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-50"><Download size={15} /> Descargar Excel</button>
         </div>
       </div>
 

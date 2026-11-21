@@ -6,6 +6,7 @@ import { Module } from 'node:module';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ts from 'typescript';
+import * as XLSX from 'xlsx';
 import { loadTs } from './helpers/loadTs.mjs';
 
 const summary = loadTs(fileURLToPath(new URL('../src/modules/cash-register/utils/cashSummary.ts', import.meta.url)));
@@ -46,10 +47,27 @@ test('group totals use visible movements, retain chronological order and separat
   assert.equal(groupEntries(entries.filter(e => e.id === 'a'))[0].total, 10);
 });
 
-test('CSV exports the selected source rows and prevents spreadsheet formula execution', () => {
-  const csv = movements.movementsCsv([entry('1', 1, 'Yape', { description: '=HYPERLINK("unsafe")', referenceId: 'sale-1' }), entry('2', 2, 'Efectivo', { description: '\t+formula' })]);
-  assert.match(csv, /'\=HYPERLINK\(""unsafe""\)/); assert.match(csv, /'\t\+formula/);
-  assert.match(csv, /sale-1/); assert.match(csv, /"Yape";"1.00"/);
+test('Excel exports only selected movements with numeric amounts and literal text', () => {
+  const entries = [
+    entry('1', 12.75, 'Yape', { description: '=HYPERLINK("unsafe")', referenceId: 'sale-1', voucherSeries: 'BAG3', voucherNumber: '00000032', createdAt: '2026-11-21T01:30:00Z' }),
+    entry('2', 0, 'Efectivo', { description: 'Maíz orgánico', isDeleted: true }),
+    entry('3', 50, 'Yape', { type: 'EXPENSE' }),
+  ];
+  const filters = { search: '', type: 'INCOME', category: '', method: '', showDeleted: true };
+  const bytes = XLSX.write(movements.movementsWorkbook(movements.filterCashEntries(entries, filters)), { type: 'buffer', bookType: 'xlsx' });
+  assert.equal(bytes.subarray(0, 2).toString(), 'PK', 'The output must be an XLSX archive');
+  const workbook = XLSX.read(bytes, { type: 'buffer', cellNF: true });
+  assert.deepEqual(workbook.SheetNames, ['Movimientos']);
+  const sheet = workbook.Sheets.Movimientos;
+  const rows = XLSX.utils.sheet_to_json(sheet);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0]['Monto S/'], 12.75); assert.equal(sheet.F2.t, 'n'); assert.equal(sheet.F2.z, '#,##0.00');
+  assert.equal(rows[1]['Monto S/'], 0); assert.equal(rows[1].Estado, 'Anulado');
+  assert.equal(rows[0]['Descripción'], '=HYPERLINK("unsafe")'); assert.equal(sheet.D2.t, 's'); assert.equal(sheet.D2.f, undefined);
+  assert.equal(rows[1]['Descripción'], 'Maíz orgánico');
+  assert.equal(rows[0].Comprobante, 'BAG3-00000032');
+  assert.equal(rows[0]['Fecha y hora (Lima)'], new Date(entries[0].createdAt).toLocaleString('es-PE', { timeZone: 'America/Lima' }));
+  assert.deepEqual(sheet['!autofilter'], { ref: 'A1:I3' });
 });
 
 const componentCache = new Map();

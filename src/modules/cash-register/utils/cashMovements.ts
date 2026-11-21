@@ -1,4 +1,5 @@
 import type { CashRegisterEntry } from '../../../shared/types';
+import * as XLSX from 'xlsx';
 import { cashMethodKey, entryPaymentMethod } from './cashSummary';
 
 export function filterCashEntries(entries: CashRegisterEntry[], filters: { search: string; type: string; category: string; method: string; showDeleted: boolean }) {
@@ -10,20 +11,19 @@ export function filterCashEntries(entries: CashRegisterEntry[], filters: { searc
     && (!search || [e.description, e.referenceId, e.voucherSeries, e.voucherNumber, entryPaymentMethod(e), e.deleteReason].filter(Boolean).join(' ').toLocaleLowerCase('es').includes(search)));
 }
 
-export function movementsCsv(entries: CashRegisterEntry[]) {
-  const cell = (value: unknown) => {
-    let text = String(value ?? '');
-    if (/^[\s\uFEFF]*[=+@-]/.test(text)) text = `'${text}`;
-    return `"${text.replace(/"/g, '""')}"`;
-  };
-  return '\uFEFF' + [
+export function movementsWorkbook(entries: CashRegisterEntry[]) {
+  const sheet = XLSX.utils.aoa_to_sheet([
     ['Fecha y hora (Lima)', 'Tipo', 'Categoría', 'Descripción', 'Método', 'Monto S/', 'Estado', 'Referencia', 'Comprobante'],
-    ...entries.map(e => [e.createdAt ? new Date(e.createdAt).toLocaleString('es-PE', { timeZone: 'America/Lima' }) : '', e.type === 'INCOME' ? 'Ingreso' : 'Egreso', e.category, e.description, entryPaymentMethod(e) || 'Sin identificar', e.amount.toFixed(2), e.isDeleted ? 'Anulado' : 'Activo', e.referenceId, [e.voucherSeries, e.voucherNumber].filter(Boolean).join('-')]),
-  ].map(row => row.map(cell).join(';')).join('\r\n');
+    ...entries.map(e => [e.createdAt ? new Date(e.createdAt).toLocaleString('es-PE', { timeZone: 'America/Lima' }) : '', e.type === 'INCOME' ? 'Ingreso' : 'Egreso', e.category, e.description, entryPaymentMethod(e) || 'Sin identificar', e.amount, e.isDeleted ? 'Anulado' : 'Activo', e.referenceId || '', [e.voucherSeries, e.voucherNumber].filter(Boolean).join('-')]),
+  ]);
+  sheet['!cols'] = [22, 12, 23, 60, 22, 16, 12, 28, 24].map(wch => ({ wch }));
+  sheet['!autofilter'] = { ref: sheet['!ref']! };
+  entries.forEach((_, index) => { sheet[`F${index + 2}`].z = '#,##0.00'; });
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Movimientos');
+  return workbook;
 }
 
 export function downloadMovements(entries: CashRegisterEntry[], date: string) {
-  const url = URL.createObjectURL(new Blob([movementsCsv(entries)], { type: 'text/csv;charset=utf-8' }));
-  const link = document.createElement('a'); link.href = url; link.download = `Caja-${date}.csv`; link.click();
-  URL.revokeObjectURL(url);
+  XLSX.writeFile(movementsWorkbook(entries), `Caja-${date}.xlsx`, { bookType: 'xlsx', compression: true });
 }
