@@ -27,7 +27,7 @@ test('accounting navigation includes consultation and excludes creation, editing
 async function mount(t,relative,role='CONTABILIDAD',initialRoute='/',receipt=null,cashRegister=null){
  const reads=[],writes=[],downloads=[];const auth={user:{role,branchAssignments:[{branchId:id,role}]},selectedBranch:{id,name:'Sausal',companyIds:[id],defaultCompanyId:id}};
  const wrap=data=>({data:{data}});
- const api={get:async route=>{reads.push(route);if(route==='/companies')return wrap([{id,name:'Empresa de prueba',ruc:'20600000001',isActive:true}]);if(['/categories','/units','/price-tiers','/payment-methods','/payment-agreements','/product-lots','/product-lots/expiring'].includes(route)||route.startsWith('/stock/alerts/'))return wrap([]);if(route==='/cash-registers/today')return wrap(cashRegister);if(receipt && route==='/billing/documents')return wrap({data:[receipt],total:1});if(receipt && route==='/billing/documents/'+receipt.id)return wrap(receipt);if(route==='/billing/status')return wrap({ready:true,environment:'beta',supportedDocumentTypes:['FACTURA','BOLETA'],creditNotes:{ready:true}});if(route==='/accounts-payable/alerts')return wrap({overdue:[],upcoming:[]});return wrap({data:[],total:0});}};
+ const api={get:async route=>{reads.push(route);if(route==='/companies')return wrap([{id,name:'Empresa de prueba',ruc:'20600000001',isActive:true}]);if(['/categories','/units','/price-tiers','/payment-methods','/payment-agreements','/product-lots','/product-lots/expiring'].includes(route)||route.startsWith('/stock/alerts/'))return wrap([]);if(route==='/cash-registers/today')return wrap(cashRegister);if(route==='/cash-registers')return wrap({data:cashRegister?[cashRegister]:[],total:cashRegister?1:0});if(route==='/cash-registers/'+id)return wrap(cashRegister);if(receipt && route==='/billing/documents')return wrap({data:[receipt],total:1});if(receipt && route==='/billing/documents/'+receipt.id)return wrap(receipt);if(route==='/billing/status')return wrap({ready:true,environment:'beta',supportedDocumentTypes:['FACTURA','BOLETA'],creditNotes:{ready:true}});if(route==='/accounts-payable/alerts')return wrap({overdue:[],upcoming:[]});return wrap({data:[],total:0});}};
  for(const method of ['post','put','patch','delete'])api[method]=async(...args)=>{writes.push([method,...args]);throw Error('Unexpected mutation');};
  const cache=new Map();
  const load=filename=>{
@@ -80,6 +80,37 @@ test('a billing sale URL cannot start draft preparation for an accountant',async
 });
 
 test('administrators keep the create customer action',async t=>{const h=await mount(t,'modules/clients/pages/ClientsPage','ADMIN');assert.ok(h.buttons().some(label=>label.includes('Nuevo Cliente')));});
+
+test('sellers can open cash and reconcile without editing, deleting or adjusting movements',async t=>{
+ const empty=await mount(t,'modules/cash-register/pages/CashRegisterPage','VENDEDOR');
+ assert.ok(empty.buttons().some(label=>label.includes('Abrir Caja')));
+ const register={id,date:'2026-11-21',openingBalance:100,status:'OPEN',revision:3,entries:[{id:'a',description:'Venta en efectivo',amount:50,type:'INCOME',category:'SALE',paymentMethodName:'Efectivo',voucherType:'NONE',isDeleted:false,editHistory:[]},{id:'b',description:'Venta por Yape',amount:12,type:'INCOME',category:'SALE',paymentMethodName:'Yape',voucherType:'NONE',isDeleted:false,editHistory:[]}]};
+ const h=await mount(t,'modules/cash-register/pages/CashRegisterPage','VENDEDOR','/',null,register);
+ assert.ok(h.reads.includes('/cash-registers/today'));
+ for(const label of h.buttons())assert.doesNotMatch(label,/^(?:\+?\s*)?(?:Ingreso|Egreso|Ajuste|Editar|Anular movimiento manual)$/);
+ assert.equal(h.tree.root.findAllByType('button').some(button=>['Editar','Anular movimiento manual'].includes(button.props.title)),false);
+ const close=h.tree.root.findAllByType('button').find(button=>text(button).includes('Cerrar Caja'));assert.ok(close);
+ await act(async()=>close.props.onClick());
+ const counted=h.tree.root.findByProps({id:'cash-counted'});
+ await act(async()=>counted.props.onChange({target:{value:'149'}}));
+ assert.ok(text(h.tree.root).includes('Faltante: S/ 1.00'));
+ let confirm=h.tree.root.findAllByType('button').find(button=>text(button).includes('Confirmar cierre con arqueo'));
+ assert.equal(confirm.props.disabled,true,'A difference needs an explanation');
+ await act(async()=>counted.props.onChange({target:{value:'150'}}));
+ assert.ok(text(h.tree.root).includes('El efectivo contado coincide con el esperado.'));
+ confirm=h.tree.root.findAllByType('button').find(button=>text(button).includes('Confirmar cierre con arqueo'));
+ assert.equal(confirm.props.disabled,false,'Yape is excluded from the physical cash count');
+ assert.equal(h.writes.length,0);
+});
+
+test('cash history lets sellers reconcile their open register and keeps accountants read-only',async t=>{
+ const register={id,date:'2026-11-20',openingBalance:100,status:'OPEN',entries:[]};
+ const seller=await mount(t,'modules/cash-register/pages/CashRegisterHistoryPage','VENDEDOR','/',null,register);
+ assert.ok(seller.buttons().some(label=>label.trim()==='Cerrar'));
+ const accountant=await mount(t,'modules/cash-register/pages/CashRegisterHistoryPage','CONTABILIDAD','/',null,register);
+ assert.equal(accountant.buttons().some(label=>label.trim()==='Cerrar'),false);
+ assert.equal(seller.writes.length,0);assert.equal(accountant.writes.length,0);
+});
 
 for(const status of ['DRAFT','ACCEPTED','PENDING'])test('accounting receipt detail keeps files and blocks operations for '+status,async t=>{
  const receipt={id,branchId:id,saleId:id,documentType:'BOLETA',taxType:'GRAVADO',status,series:'B001',number:1,issuer:{name:'Emisor',documentNumber:'20600000001'},receiver:{name:'Cliente',documentType:'UNIDENTIFIED'},items:[],warnings:[],taxableAmount:29.66,exemptAmount:0,unaffectedAmount:0,taxAmount:5.34,total:35,hasPdf:true,hasXml:true,hasCdr:status==='ACCEPTED',paymentCondition:'CONTADO'};

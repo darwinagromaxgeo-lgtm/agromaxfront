@@ -403,9 +403,9 @@ export function CashRegisterHistoryPage() {
         </div>
       </Modal>
 
-      <Modal isOpen={showCloseModal} onClose={() => setShowCloseModal(false)} title={`Cerrar caja — ${closeTarget?.date || ''}`}>
+      <WriteAccess><Modal isOpen={showCloseModal} onClose={() => setShowCloseModal(false)} title={`Cerrar caja — ${closeTarget?.date || ''}`}>
         {closeTarget && <CashCloseForm register={closeTarget} pending={closeRegister.isPending} onSubmit={async data => { await closeRegister.mutateAsync({ registerId: closeTarget.id, data }); setShowCloseModal(false); }} />}
-      </Modal>
+      </Modal></WriteAccess>
     </div>
   );
 }

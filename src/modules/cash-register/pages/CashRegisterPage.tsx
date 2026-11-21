@@ -158,11 +158,11 @@ export function CashRegisterPage() {
         <td className="px-4 py-3">
           {!entry.isDeleted && !nested && (
             <div className="flex gap-1 justify-center">
-              <WriteAccess><button onClick={() => openEdit(entry)} title="Editar"
+              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => openEdit(entry)} title="Editar"
                 className="p-1.5 text-blue-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
                 <Edit2 size={13} />
               </button></WriteAccess>
-              <WriteAccess><button disabled={!!entry.referenceId} onClick={() => openDelete(entry)} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'}
+              <WriteAccess excludeRoles={['VENDEDOR']}><button disabled={!!entry.referenceId} onClick={() => openDelete(entry)} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'}
                 className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 rounded-lg transition-colors">
                 <Trash2 size={13} />
               </button></WriteAccess>
@@ -233,11 +233,11 @@ export function CashRegisterPage() {
         </div>
         {!isClosed && !entry.isDeleted && !nested && (
           <div className="flex gap-1 flex-shrink-0">
-            <WriteAccess><button onClick={() => openEdit(entry)}
+            <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => openEdit(entry)}
               className="p-2 text-blue-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
               <Edit2 size={14} />
             </button></WriteAccess>
-            <WriteAccess><button disabled={!!entry.referenceId} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'} onClick={() => openDelete(entry)}
+            <WriteAccess excludeRoles={['VENDEDOR']}><button disabled={!!entry.referenceId} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'} onClick={() => openDelete(entry)}
               className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 rounded-lg transition-colors">
               <Trash2 size={14} />
             </button></WriteAccess>
@@ -314,15 +314,15 @@ export function CashRegisterPage() {
           <>
             {/* Mobile: grid 2×2 */}
             <div className="grid grid-cols-2 gap-2 sm:hidden">
-              <WriteAccess><button onClick={openAddIncome}
+              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddIncome}
                 className="flex items-center justify-center gap-2 py-3.5 bg-primary-600 text-white rounded-xl text-sm font-semibold shadow-sm shadow-primary-200 active:scale-[0.97] transition-all">
                 <TrendingUp size={17} /> Ingreso
               </button></WriteAccess>
-              <WriteAccess><button onClick={openAddExpense}
+              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddExpense}
                 className="flex items-center justify-center gap-2 py-3.5 bg-red-500 text-white rounded-xl text-sm font-semibold shadow-sm shadow-red-200 active:scale-[0.97] transition-all">
                 <TrendingDown size={17} /> Egreso
               </button></WriteAccess>
-              <WriteAccess><button onClick={() => { setAdjustForm({ openingBalance: register?.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }}
+              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => { setAdjustForm({ openingBalance: register?.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }}
                 className="flex items-center justify-center gap-2 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-semibold shadow-sm shadow-amber-200 active:scale-[0.97] transition-all">
                 <SlidersHorizontal size={15} /> Ajuste
               </button></WriteAccess>
@@ -333,15 +333,15 @@ export function CashRegisterPage() {
             </div>
             {/* Tablet / Desktop: fila */}
             <div className="hidden sm:flex flex-wrap gap-2">
-              <WriteAccess><button onClick={openAddIncome}
+              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddIncome}
                 className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 text-sm font-semibold shadow-sm shadow-primary-200 transition-colors">
                 <TrendingUp size={15} /> Ingreso
               </button></WriteAccess>
-              <WriteAccess><button onClick={openAddExpense}
+              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddExpense}
                 className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 text-sm font-semibold shadow-sm shadow-red-200 transition-colors">
                 <TrendingDown size={15} /> Egreso
               </button></WriteAccess>
-              <WriteAccess><button onClick={() => { setAdjustForm({ openingBalance: register?.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }}
+              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => { setAdjustForm({ openingBalance: register?.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }}
                 className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 text-sm font-semibold shadow-sm shadow-amber-200 transition-colors">
                 <SlidersHorizontal size={15} /> Ajuste
               </button></WriteAccess>
@@ -408,8 +408,8 @@ export function CashRegisterPage() {
               <p className="text-sm text-gray-400">No hay movimientos que coincidan</p>
               {!isClosed && (
                 <div className="flex items-center justify-center gap-2 mt-3">
-                  <WriteAccess><button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button></WriteAccess>
-                  <WriteAccess><button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button></WriteAccess>
+                  <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button></WriteAccess>
+                  <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button></WriteAccess>
                 </div>
               )}
             </div>
@@ -535,8 +535,8 @@ export function CashRegisterPage() {
                     <p className="text-sm text-gray-400">No hay movimientos que coincidan</p>
                     {!isClosed && (
                       <div className="flex items-center justify-center gap-2 mt-3">
-                        <WriteAccess><button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button></WriteAccess>
-                        <WriteAccess><button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button></WriteAccess>
+                        <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button></WriteAccess>
+                        <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button></WriteAccess>
                       </div>
                     )}
                   </td>
@@ -549,6 +549,7 @@ export function CashRegisterPage() {
 
       {/* ── Modals ── */}
 
+      <WriteAccess excludeRoles={['VENDEDOR']}>
       <Modal isOpen={showAddModal} onClose={() => { setShowAddModal(false); setRucInput(''); setRucFound(''); }}
         title={addForm.type === 'INCOME' ? 'Nuevo Ingreso' : 'Nuevo Egreso'}>
         <form onSubmit={handleAdd} className="space-y-4">
@@ -717,9 +718,11 @@ export function CashRegisterPage() {
         </form>
       </Modal>
 
-      <Modal isOpen={showCloseModal} onClose={() => setShowCloseModal(false)} title="Cerrar caja con arqueo">
+      </WriteAccess>
+
+      <WriteAccess><Modal isOpen={showCloseModal} onClose={() => setShowCloseModal(false)} title="Cerrar caja con arqueo">
         {closeTarget && <CashCloseForm register={closeTarget} pending={closeRegister.isPending} onSubmit={async data => { await closeRegister.mutateAsync({ registerId: closeTarget.id, data }); setShowCloseModal(false); }} />}
-      </Modal>
+      </Modal></WriteAccess>
     </div>
   );
 }

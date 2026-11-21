@@ -79,7 +79,7 @@ export function Layout() {
   const isSeller = user?.role === 'VENDEDOR';
   const home = roleHome(user?.role);
   const bottomNav = isSeller ? [
-    { path: '/quotes', label: 'Cotizaciones', icon: ScrollText },
+    { path: '/cash-register', label: 'Caja', icon: Wallet },
     { path: '/sales', label: 'Ventas', icon: ShoppingCart },
     { path: '/pos', label: 'POS', icon: ScanLine },
     { path: '/clients', label: 'Clientes', icon: Users },
