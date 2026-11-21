@@ -41,7 +41,7 @@ export function saleNoteDocument({ sale, companies, client, products, branchId }
     receiver: { name: client?.name || 'Consumidor final', documentType: documentNumber.length === 11 ? 'RUC' : documentNumber.length === 8 ? 'DNI' : 'UNIDENTIFIED', documentNumber: documentNumber || undefined, address: client?.address },
     items, taxableAmount: base('GRAVADO'), exemptAmount: base('EXONERADO'), unaffectedAmount: base('INAFECTO'),
     taxAmount: items.reduce((sum, item) => sum + Math.round(item.taxAmount * 100), 0) / 100, total: sale.total,
-    payments: sale.payments, issuerPhone: company?.phone,
+    payments: sale.payments, issuerPhone: company?.phone, issuerBankAccounts: company?.bankAccounts,
     legacyTaxData, warnings: legacyTaxData ? ['Nota de una venta anterior: algunos datos tributarios se completaron con el catálogo actual.'] : [],
   };
 }

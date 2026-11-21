@@ -1,4 +1,6 @@
 import { BrandLogo } from '../../../shared/components/BrandLogo';
+import { commercialPaymentTotals } from '../../../shared/branding/commercialDocumentPdf';
+import { SaleNotePaper } from './SaleNotePaper';
 import type { BillingPrintDocument } from '../utils/printTypes';
 import { billingMoney, billingPresentation, billingQuantity, type BillingPreviewOptions, type BillingPrintFormat } from '../utils/documentPresentation';
 import './billingPreview.css';
@@ -8,6 +10,7 @@ export function BillingDocumentPaper({ document, format, options = {} }: {
 }) {
   const view = billingPresentation(document, options);
   const ticket = format === 'TICKET';
+  if (document.documentType === 'NOTA_VENTA' && !ticket && !options.example && !options.simulation) return <SaleNotePaper document={document} />;
   return <article className={`billing-sheet ${ticket ? 'billing-sheet-ticket' : 'billing-sheet-a4'}`} aria-label={`${ticket ? 'Ticket de 80 mm' : 'Hoja A4'}: ${view.title}`}>
     <header className="billing-sheet-header">
       <div className="billing-sheet-brand"><BrandLogo variant="compact" className="billing-sheet-logo" /><h3>{document.issuer.name}</h3><p className="billing-sheet-ruc">{view.issuerIdentity}</p><p>{view.issuerAddress}</p></div>
@@ -31,8 +34,10 @@ export function BillingDocumentPaper({ document, format, options = {} }: {
       {(!ticket || document.exemptAmount > 0) && <p><span>Op. exoneradas</span><b>{billingMoney(document.exemptAmount)}</b></p>}
       {(!ticket || document.unaffectedAmount > 0) && <p><span>Op. inafectas</span><b>{billingMoney(document.unaffectedAmount)}</b></p>}
       <p><span>IGV</span><b>{billingMoney(document.taxAmount)}</b></p>
-      <p className="billing-sheet-grand-total"><span>{document.cancelledByCreditNoteId ? 'IMPORTE ANULADO' : document.documentType === 'NOTA_CREDITO' ? 'TOTAL A ACREDITAR' : 'TOTAL A PAGAR'}</span><b>{billingMoney(document.total)}</b></p>
+      <p className="billing-sheet-grand-total"><span>{document.cancelledByCreditNoteId ? 'IMPORTE ANULADO' : document.documentType === 'NOTA_CREDITO' ? 'TOTAL A ACREDITAR' : document.documentType === 'NOTA_VENTA' ? 'IMPORTE TOTAL' : 'TOTAL A PAGAR'}</span><b>{billingMoney(document.total)}</b></p>
     </section>
+    {document.documentType === 'NOTA_VENTA' && document.payments?.length ? <section className="billing-sheet-note-payments"><p className="billing-sheet-caption">PAGOS REGISTRADOS EN LA VENTA</p>{document.payments.map((payment, index) => <p key={index}><span>{payment.paymentMethodName}</span><b>{billingMoney(payment.amount)}</b></p>)}</section> : null}
+    {document.documentType === 'NOTA_VENTA' && document.paymentCondition === 'CREDITO' && <section className="billing-sheet-note-payments"><p><span>Abono inicial</span><b>{billingMoney(commercialPaymentTotals(document.total, document.payments).paid)}</b></p><p><span>Saldo inicial</span><b>{billingMoney(commercialPaymentTotals(document.total, document.payments).pending)}</b></p><small>Los abonos posteriores y el saldo actual se consultan en Créditos.</small></section>}
     <footer className="billing-sheet-footer"><p className={view.nonFiscal ? 'billing-sheet-notice' : ''}>{view.notice}</p>{!view.nonFiscal && document.hash && <p className="billing-sheet-hash">Hash: {document.hash}</p>}<p className="billing-sheet-thanks">Gracias por tu compra</p><p>Agromax · Innovando la agricultura</p></footer>
   </article>;
 }

@@ -12,8 +12,10 @@ import type { CashRegister, CashRegisterEntry } from '../../../shared/types';
 import { getTodayDateString, getMonthRange } from '../../../shared/utils/date.util';
 import { groupEntries } from '../utils/groupEntries';
 import { CashCloseForm } from '../components/CashCloseForm';
-import { CashMethodBreakdown, CashCountResult, cashCategoryLabels } from '../components/CashOverview';
+import { CashMethodBreakdown, CashCountResult, CashMetric, cashCategoryLabels } from '../components/CashOverview';
 import { entryPaymentMethod, summarizeCash } from '../utils/cashSummary';
+import { CashPageHeader } from '../components/CashPageHeader';
+import { useAuth } from '../../../app/providers/AuthProvider';
 
 const categoryLabels = cashCategoryLabels;
 
@@ -29,6 +31,7 @@ function calcTotals(entries: CashRegisterEntry[]) {
 }
 
 export function CashRegisterHistoryPage() {
+  const { selectedBranch } = useAuth();
   const monthRange = getMonthRange();
   const [page, setPage] = useState(1);
   const [startDate, setStartDate] = useState(monthRange.start);
@@ -39,13 +42,15 @@ export function CashRegisterHistoryPage() {
   const [closeTarget, setCloseTarget] = useState<CashRegister | null>(null);
   const [expandedDetailGroups, setExpandedDetailGroups] = useState<Set<string>>(new Set());
 
-  const { data, isLoading } = useCashRegisters({ page, limit: 20, startDate: startDate || undefined, endDate: endDate || undefined });
+  const { data, isLoading, isError, refetch } = useCashRegisters({ page, limit: 20, startDate: startDate || undefined, endDate: endDate || undefined });
   const { data: detail } = useCashRegisterById(selectedId);
   const closeRegister = useCloseCashRegister();
 
   const registers: CashRegister[] = data?.data || [];
   const total = data?.total || 0;
   const today = getTodayDateString();
+  const lastWeekStart = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  const setRange = (start: string, end: string) => { setStartDate(start); setEndDate(end); setPage(1); };
 
   const openDetail = (reg: CashRegister) => { setSelectedId(reg.id); setExpandedDetailGroups(new Set()); setShowDetail(true); };
   const openClose = (reg: CashRegister) => { setCloseTarget(reg); setShowCloseModal(true); };
@@ -115,85 +120,35 @@ export function CashRegisterHistoryPage() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-          <History size={22} className="text-primary-600" /> Historial de Cajas
-        </h1>
-      </div>
-
-      {/* Nav tabs */}
-      <div className="flex gap-2 mb-6">
-        <Link to="/cash-register"
-          className="flex items-center gap-1.5 px-4 py-2 text-gray-500 hover:text-gray-700 rounded-full text-sm font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-          <Wallet size={14} /> Hoy
-        </Link>
-        <span className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white rounded-full text-sm font-semibold shadow-sm shadow-primary-200">
-          <History size={14} /> Historial de Cajas
-        </span>
-      </div>
-
-      {/* Date filter */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 mb-5">
+      <CashPageHeader history branchName={selectedBranch?.name} />
+      <nav aria-label="Secciones de caja" className="my-5 flex gap-2">
+        <Link to="/cash-register" className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:border-primary-300 hover:text-primary-700"><Wallet size={15} />Hoy</Link>
+        <span aria-current="page" className="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm"><History size={15} />Historial de Cajas</span>
+      </nav>
+      <section aria-label="Filtrar cajas por fecha" className="mb-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-bold text-gray-900">Elige un período</h2><p className="mt-1 text-xs text-gray-500">Revisa cada cierre y su arqueo de efectivo.</p></div><div className="flex flex-wrap gap-2">{[['Hoy', today, today], ['Últimos 7 días', lastWeekStart, today], ['Mes actual', monthRange.start, monthRange.end]].map(([label, start, end]) => <button key={label} onClick={() => setRange(start, end)} className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${startDate === start && endDate === end ? 'border-primary-200 bg-primary-50 text-primary-800' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>{label}</button>)}</div></div>
         <div className="flex flex-wrap items-end gap-4">
-          <div>
-            <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Desde</label>
-            <input type="date" value={startDate}
-              onChange={e => { setStartDate(e.target.value); setPage(1); }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary-400 transition-colors" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Hasta</label>
-            <input type="date" value={endDate}
-              onChange={e => { setEndDate(e.target.value); setPage(1); }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary-400 transition-colors" />
-          </div>
-          {(startDate !== monthRange.start || endDate !== monthRange.end) && (
-            <button onClick={() => { setStartDate(monthRange.start); setEndDate(monthRange.end); setPage(1); }}
-              className="px-3 py-2 text-sm text-primary-600 hover:text-primary-800 font-medium border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors">
-              Mes actual
-            </button>
-          )}
-          {registers.length > 0 && (
-            <div className="ml-auto flex items-center gap-4 text-sm text-gray-500">
-              <span><span className="font-semibold text-gray-700">{total}</span> caja{total !== 1 ? 's' : ''}</span>
-              {periodSummary.open > 0 && (
-                <span className="text-amber-600 font-medium">{periodSummary.open} abierta{periodSummary.open !== 1 ? 's' : ''}</span>
-              )}
-            </div>
-          )}
+          <div className="min-w-0 flex-1 sm:max-w-xs"><label htmlFor="cash-history-from" className="mb-1.5 block text-xs font-semibold text-gray-600">Desde</label><input id="cash-history-from" type="date" value={startDate} onChange={e => { setStartDate(e.target.value); setPage(1); }} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100" /></div>
+          <div className="min-w-0 flex-1 sm:max-w-xs"><label htmlFor="cash-history-to" className="mb-1.5 block text-xs font-semibold text-gray-600">Hasta</label><input id="cash-history-to" type="date" value={endDate} onChange={e => { setEndDate(e.target.value); setPage(1); }} className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100" /></div>
+          {!isError && <p className="pb-2 text-sm text-gray-600"><strong className="text-gray-900">{total}</strong> caja{total === 1 ? '' : 's'} encontrada{total === 1 ? '' : 's'}</p>}
         </div>
-      </div>
-
-      {/* Period summary cards */}
-      {!isLoading && registers.length > 0 && (
-        <div className="grid grid-cols-2 gap-4 mb-5">
-          <div className="bg-white rounded-xl border border-primary-100 shadow-sm px-5 py-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-semibold text-primary-500 uppercase tracking-wide">Ingresos de esta página</p>
-              <div className="p-1.5 bg-primary-50 rounded-lg"><TrendingUp size={13} className="text-primary-500" /></div>
-            </div>
-            <p className="text-xl font-bold text-primary-700">+ S/ {periodSummary.totalIncome.toFixed(2)}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-red-100 shadow-sm px-5 py-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[11px] font-semibold text-red-400 uppercase tracking-wide">Egresos de esta página</p>
-              <div className="p-1.5 bg-red-50 rounded-lg"><TrendingDown size={13} className="text-red-400" /></div>
-            </div>
-            <p className="text-xl font-bold text-red-600">− S/ {periodSummary.totalExpense.toFixed(2)}</p>
-          </div>
-        </div>
-      )}
+      </section>
+      {!isLoading && !isError && registers.length > 0 && <div className="mb-2 grid grid-cols-2 gap-3 xl:grid-cols-3">
+        <CashMetric label="Ingresos de esta página" value={periodSummary.totalIncome} help="Cobros de todos los métodos" tone="income" icon="income" />
+        <CashMetric label="Egresos de esta página" value={periodSummary.totalExpense} help="Pagos y retiros registrados" tone="expense" icon="expense" />
+        <CashMetric label="Movimiento neto de esta página" value={periodSummary.totalIncome - periodSummary.totalExpense} help="Ingresos menos egresos, sin aperturas" tone="balance" />
+      </div>}
+      {!isLoading && !isError && registers.length > 0 && <p className="mb-5 text-xs leading-5 text-gray-500">Resumen de las {registers.length} cajas visibles de {total}. {periodSummary.open} abierta{periodSummary.open === 1 ? '' : 's'} en esta página.</p>}
 
       {/* Registers list */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
         {/* Table header */}
         <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50/60">
           <CalendarDays size={14} className="text-gray-400" />
           <span className="text-sm font-semibold text-gray-600">Cajas registradas</span>
         </div>
 
-        {isLoading ? (
+        {isError ? <div role="alert" className="p-6 text-sm text-red-800">No se pudo cargar el historial. <button onClick={() => void refetch()} className="font-bold underline">Volver a intentar</button></div> : isLoading ? (
           <div className="flex items-center justify-center py-16">
             <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-primary-600" />
           </div>
@@ -203,14 +158,14 @@ export function CashRegisterHistoryPage() {
             <p className="text-sm text-gray-400">No hay cajas en este período</p>
           </div>
         ) : (
-          <table className="w-full">
+          <div className="overflow-x-auto"><table className="w-full min-w-[830px]">
             <thead>
               <tr className="border-b border-gray-100">
                 <th className="px-5 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Fecha</th>
                 <th className="px-5 py-3 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Apertura</th>
                 <th className="px-5 py-3 text-right text-[11px] font-semibold text-primary-500 uppercase tracking-wide">Ingresos</th>
                 <th className="px-5 py-3 text-right text-[11px] font-semibold text-red-400 uppercase tracking-wide">Egresos</th>
-                <th className="px-5 py-3 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Cierre</th>
+                <th className="px-5 py-3 text-right text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Saldo general al cerrar</th>
                 <th className="px-5 py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Estado</th>
                 <th className="px-5 py-3" />
               </tr>
@@ -282,7 +237,7 @@ export function CashRegisterHistoryPage() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

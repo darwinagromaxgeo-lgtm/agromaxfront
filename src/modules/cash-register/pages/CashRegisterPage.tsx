@@ -9,13 +9,16 @@ import { Modal } from '../../../shared/components/Modal';
 import { Wallet, TrendingUp, TrendingDown, Edit2, Trash2, Lock, History, ChevronDown, ChevronRight, Layers, Search, Loader2, SlidersHorizontal, Receipt, RefreshCw, Download } from 'lucide-react';
 import type { CashRegister, CashRegisterEntry, PaymentMethod } from '../../../shared/types';
 import { groupEntries } from '../utils/groupEntries';
-import { CashOverview, cashCategoryLabels } from '../components/CashOverview';
+import { CashOverview, cashCategoryLabels, money } from '../components/CashOverview';
 import { CashCloseForm } from '../components/CashCloseForm';
 import { entryPaymentMethod, cashMethodKey, summarizeCash } from '../utils/cashSummary';
 import { filterCashEntries, downloadMovements } from '../utils/cashMovements';
+import { CashPageHeader } from '../components/CashPageHeader';
+import { useAuth } from '../../../app/providers/AuthProvider';
 
 export function CashRegisterPage() {
   const readOnly = useAccountingReadOnly();
+  const { selectedBranch } = useAuth();
   const { data: register, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useCashRegisterToday();
   const openCashRegister = useOpenCashRegister();
   const addEntry = useAddCashEntry();
@@ -55,6 +58,8 @@ export function CashRegisterPage() {
   const summary = summarizeCash(register?.openingBalance || 0, entries);
   const netBalance = summary.balance;
   const filteredEntries = filterCashEntries(entries, filters);
+  const filteredSummary = summarizeCash(0, filteredEntries);
+  const hasFilters = !!(filters.search.trim() || filters.type || filters.category || filters.method || filters.showDeleted);
 
   const openAddIncome = () => { setAddForm({ type: 'INCOME', category: 'OTHER', description: '', amount: 0, voucherType: 'NONE', voucherSeries: '', voucherNumber: '', paymentMethodId: '', remisionSerie: '', remisionCorrelativo: '', remisionFecha: '' }); setShowAddModal(true); };
   const openAddExpense = () => { setAddForm({ type: 'EXPENSE', category: 'OPERATING_EXPENSE', description: '', amount: 0, voucherType: 'NONE', voucherSeries: '', voucherNumber: '', paymentMethodId: paymentMethods.find(pm => cashMethodKey(pm.name) === 'efectivo' && pm.isActive)?.id || '', remisionSerie: '', remisionCorrelativo: '', remisionFecha: '' }); setRucInput(''); setRucFound(''); setShowAddModal(true); };
@@ -256,133 +261,64 @@ export function CashRegisterPage() {
 
   if (isError) return <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-900">No se pudo cargar Caja. <button onClick={() => void refetch()} className="font-bold underline">Volver a intentar</button></div>;
 
-  // ── Sin caja ───────────────────────────────────────────────────────────────
+  // ── Apertura ──────────────────────────────────────────────────────────────
   if (!register) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh]">
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-10 max-w-sm w-full text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-50 rounded-2xl mb-5">
-            <Wallet size={32} className="text-primary-600" />
+    return <div className="space-y-6">
+      <CashPageHeader branchName={selectedBranch?.name} />
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="grid lg:grid-cols-2">
+          <div className="p-6 sm:p-10">
+            <div className="mb-5 grid h-14 w-14 place-items-center rounded-2xl bg-primary-50 text-primary-700"><Wallet size={28} /></div>
+            <h2 className="text-2xl font-bold text-gray-950">{readOnly ? 'No hay caja abierta' : 'Comienza el día'}</h2>
+            <p className="mb-6 mt-2 max-w-md text-sm leading-6 text-gray-600">{readOnly ? 'Puedes consultar los movimientos y arqueos anteriores en el historial.' : 'Cuenta el efectivo con el que empiezas e ingresa el monto para abrir la caja de tu sucursal.'}</p>
+            <WriteAccess><form onSubmit={handleOpen} className="max-w-sm space-y-4">
+              <label htmlFor="cash-opening-amount" className="block text-sm font-semibold text-gray-700">Efectivo inicial (S/)</label>
+              <div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 font-semibold text-gray-500">S/</span>
+                <input id="cash-opening-amount" type="number" min="0" step="0.01" value={openingAmount || ''} onChange={e => setOpeningAmount(parseFloat(e.target.value) || 0)} className="w-full rounded-xl border border-gray-300 py-3 pl-11 pr-4 text-2xl font-bold tabular-nums text-gray-950 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100" placeholder="0.00" />
+              </div>
+              <p className="text-xs leading-5 text-gray-500">Solo billetes y monedas. Los pagos digitales se registran por separado.</p>
+              <button type="submit" disabled={openCashRegister.isPending} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 py-3.5 font-semibold text-white shadow-sm hover:bg-primary-700 disabled:opacity-50"><Wallet size={18} />{openCashRegister.isPending ? 'Abriendo...' : 'Abrir Caja'}</button>
+            </form></WriteAccess>
+            <Link to="/cash-register/history" className="mt-6 inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 hover:border-primary-300 hover:bg-primary-50"><History size={16} />Ver historial de cajas</Link>
           </div>
-          <h2 className="text-xl font-bold text-gray-800 mb-1">No hay caja abierta</h2>
-          <p className="text-sm text-gray-500 mb-6">{readOnly ? 'Consulta las cajas anteriores en el historial.' : 'Ingresa el monto inicial para abrir la caja del día'}</p>
-          <WriteAccess><form onSubmit={handleOpen} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Monto inicial (S/)</label>
-              <input
-                type="number" min="0" step="0.01"
-                value={openingAmount || ''}
-                onChange={e => setOpeningAmount(parseFloat(e.target.value) || 0)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-center text-2xl font-bold text-gray-800 focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all"
-                placeholder="0.00"
-              />
-            </div>
-            <button type="submit" disabled={openCashRegister.isPending}
-              className="w-full flex items-center justify-center gap-2 py-3.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-semibold disabled:opacity-50 transition-colors shadow-sm shadow-primary-200">
-              <Wallet size={18} />
-              {openCashRegister.isPending ? 'Abriendo...' : 'Abrir Caja'}
-            </button>
-          </form></WriteAccess>
-          <Link to="/cash-register/history"
-            className="inline-flex items-center gap-1.5 mt-5 text-sm text-gray-400 hover:text-gray-600 transition-colors">
-            <History size={14} /> Ver historial de cajas
-          </Link>
+          <div className="flex flex-col justify-center bg-gradient-to-br from-primary-600 via-primary-700 to-emerald-800 p-6 text-white sm:p-10">
+            <p className="text-xs font-bold uppercase tracking-widest text-primary-100">Tu caja, en orden</p>
+            <h3 className="mb-6 mt-3 text-2xl font-bold leading-tight">Desde la apertura<br />hasta el cuadre del día.</h3>
+            <ol className="space-y-5">{[['01', 'Registra la apertura', 'El efectivo inicial queda como punto de partida.'], ['02', 'Consulta tus movimientos', 'Revisa cobros, gastos y cada método de pago.'], ['03', 'Cuenta y cierra', 'Compara el efectivo contado y registra el arqueo.']].map(([number, title, detail]) => <li key={number} className="flex items-start gap-3"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/15 text-xs font-bold">{number}</span><div><p className="text-sm font-bold">{title}</p><p className="mt-1 text-xs leading-5 text-white/90">{detail}</p></div></li>)}</ol>
+          </div>
         </div>
       </div>
-    );
+    </div>;
   }
 
-  // ── Caja abierta / cerrada ─────────────────────────────────────────────────
-  const formattedDate = new Date(register.date + 'T12:00:00').toLocaleDateString('es-PE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
   return (
-    <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Wallet size={22} className="text-primary-600" /> Caja del Día
-          </h1>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-sm text-gray-500 capitalize">{formattedDate}</span>
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide ${isClosed ? 'bg-red-100 text-red-700' : 'bg-primary-100 text-primary-700'}`}>
-              {isClosed ? '● CERRADA' : '● ABIERTA'}
-            </span>
-          </div>
-        </div>
-        {!isClosed && (
-          <>
-            {/* Mobile: grid 2×2 */}
-            <div className="grid grid-cols-2 gap-2 sm:hidden">
-              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddIncome}
-                className="flex items-center justify-center gap-2 py-3.5 bg-primary-600 text-white rounded-xl text-sm font-semibold shadow-sm shadow-primary-200 active:scale-[0.97] transition-all">
-                <TrendingUp size={17} /> Ingreso
-              </button></WriteAccess>
-              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddExpense}
-                className="flex items-center justify-center gap-2 py-3.5 bg-red-500 text-white rounded-xl text-sm font-semibold shadow-sm shadow-red-200 active:scale-[0.97] transition-all">
-                <TrendingDown size={17} /> Egreso
-              </button></WriteAccess>
-              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => { setAdjustForm({ openingBalance: register?.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }}
-                className="flex items-center justify-center gap-2 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-semibold shadow-sm shadow-amber-200 active:scale-[0.97] transition-all">
-                <SlidersHorizontal size={15} /> Ajuste
-              </button></WriteAccess>
-              <WriteAccess><button onClick={() => { setCloseTarget(register); setShowCloseModal(true); }}
-                className="flex items-center justify-center gap-2 py-2.5 bg-gray-700 text-white rounded-xl text-sm font-semibold active:scale-[0.97] transition-all">
-                <Lock size={15} /> Cerrar Caja
-              </button></WriteAccess>
-            </div>
-            {/* Tablet / Desktop: fila */}
-            <div className="hidden sm:flex flex-wrap gap-2">
-              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddIncome}
-                className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 text-sm font-semibold shadow-sm shadow-primary-200 transition-colors">
-                <TrendingUp size={15} /> Ingreso
-              </button></WriteAccess>
-              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddExpense}
-                className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-xl hover:bg-red-600 text-sm font-semibold shadow-sm shadow-red-200 transition-colors">
-                <TrendingDown size={15} /> Egreso
-              </button></WriteAccess>
-              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => { setAdjustForm({ openingBalance: register?.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }}
-                className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 text-sm font-semibold shadow-sm shadow-amber-200 transition-colors">
-                <SlidersHorizontal size={15} /> Ajuste
-              </button></WriteAccess>
-              <WriteAccess><button onClick={() => { setCloseTarget(register); setShowCloseModal(true); }}
-                className="flex items-center gap-1.5 px-4 py-2 bg-gray-700 text-white rounded-xl hover:bg-gray-800 text-sm font-semibold transition-colors">
-                <Lock size={15} /> Cerrar Caja
-              </button></WriteAccess>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Nav tabs */}
-      <div className="flex gap-2 mb-6">
-        <span className="px-4 py-2 bg-primary-600 text-white rounded-full text-sm font-semibold shadow-sm shadow-primary-200">
-          Hoy
-        </span>
-        <Link to="/cash-register/history"
-          className="flex items-center gap-1.5 px-4 py-2 text-gray-500 hover:text-gray-700 rounded-full text-sm font-medium border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-          <History size={14} /> Historial de Cajas
-        </Link>
-      </div>
-
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
-        <span>Actualizado: {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('es-PE', { timeZone: 'America/Lima' }) : '—'} · Se actualiza automáticamente</span>
-        <button onClick={() => void refetch()} disabled={isFetching} className="flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-50"><RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} /> Actualizar</button>
-      </div>
-      <CashOverview register={register} />
-      <div className="mb-4 space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+    <div className="space-y-5">
+      <CashPageHeader branchName={selectedBranch?.name} actions={<div className="flex items-center gap-3"><span className="text-xs text-gray-500">Actualizado {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' }) : '—'}</span><button onClick={() => void refetch()} disabled={isFetching} className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"><RefreshCw size={15} className={isFetching ? 'animate-spin' : ''} />Actualizar</button></div>} />
+      <CashOverview register={register} actions={!isClosed ? <div className="flex flex-wrap gap-2">
+        <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddIncome} className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-primary-800 hover:bg-primary-50"><TrendingUp size={16} />Ingreso</button></WriteAccess>
+        <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddExpense} className="flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/20"><TrendingDown size={16} />Egreso</button></WriteAccess>
+        <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => { setAdjustForm({ openingBalance: register.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }} className="flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/20"><SlidersHorizontal size={16} />Ajuste</button></WriteAccess>
+        <WriteAccess><button onClick={() => { setCloseTarget(register); setShowCloseModal(true); }} className="flex items-center gap-1.5 rounded-xl bg-gray-950/40 px-3 py-2.5 text-sm font-bold text-white hover:bg-gray-950/60"><Lock size={16} />Cerrar Caja</button></WriteAccess>
+      </div> : undefined} />
+      <nav aria-label="Secciones de caja" className="flex gap-2">
+        <span aria-current="page" className="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm"><Wallet size={15} />Hoy</span>
+        <Link to="/cash-register/history" className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:border-primary-300 hover:text-primary-700"><History size={15} />Historial de Cajas</Link>
+      </nav>
+      <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Filtros de movimientos">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-bold text-gray-900">Encuentra un movimiento</h2><p className="mt-1 text-xs text-gray-500">Busca por producto, descripción o referencia.</p></div><button onClick={() => downloadMovements(filteredEntries, register.date)} disabled={!filteredEntries.length} className="flex items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"><Download size={15} />Descargar Excel</button></div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <label className="text-xs font-semibold text-gray-600">Buscar movimiento<input value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} placeholder="Producto, descripción, referencia…" className="mt-1 w-full rounded-lg border border-gray-200 p-2 text-sm font-normal" /></label>
-          <label className="text-xs font-semibold text-gray-600">Tipo<select value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-200 p-2 text-sm font-normal"><option value="">Ingresos y egresos</option><option value="INCOME">Ingresos</option><option value="EXPENSE">Egresos</option></select></label>
-          <label className="text-xs font-semibold text-gray-600">Origen / categoría<select value={filters.category} onChange={e => setFilters({ ...filters, category: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-200 p-2 text-sm font-normal"><option value="">Todos</option>{Object.entries(categoryLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-          <label className="text-xs font-semibold text-gray-600">Método de pago<select value={filters.method} onChange={e => setFilters({ ...filters, method: e.target.value })} className="mt-1 w-full rounded-lg border border-gray-200 p-2 text-sm font-normal"><option value="">Todos</option>{summary.methods.map(method => <option key={method.key} value={method.key || '__unknown'}>{method.name}</option>)}</select></label>
+          <label className="text-xs font-semibold text-gray-600">Buscar movimiento<input value={filters.search} onChange={e => setFilters({ ...filters, search: e.target.value })} placeholder="Producto, descripción, referencia…" className="mt-1.5 w-full rounded-xl border border-gray-200 p-2.5 text-sm font-normal outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100" /></label>
+          <label className="text-xs font-semibold text-gray-600">Tipo<select value={filters.type} onChange={e => setFilters({ ...filters, type: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 p-2.5 text-sm font-normal"><option value="">Ingresos y egresos</option><option value="INCOME">Ingresos</option><option value="EXPENSE">Egresos</option></select></label>
+          <label className="text-xs font-semibold text-gray-600">Origen / categoría<select value={filters.category} onChange={e => setFilters({ ...filters, category: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 p-2.5 text-sm font-normal"><option value="">Todos</option>{Object.entries(categoryLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+          <label className="text-xs font-semibold text-gray-600">Método de pago<select value={filters.method} onChange={e => setFilters({ ...filters, method: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 p-2.5 text-sm font-normal"><option value="">Todos</option>{summary.methods.map(method => <option key={method.key} value={method.key || '__unknown'}>{method.name}</option>)}</select></label>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={filters.showDeleted} onChange={e => setFilters({ ...filters, showDeleted: e.target.checked })} /> Mostrar anulados</label>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
+          <label className="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" checked={filters.showDeleted} onChange={e => setFilters({ ...filters, showDeleted: e.target.checked })} />Mostrar anulados</label>
           <span className="text-xs text-gray-500">{filteredEntries.length} de {entries.length} movimientos · El resumen superior incluye todos los activos.</span>
-          <button onClick={() => downloadMovements(filteredEntries, register.date)} disabled={!filteredEntries.length} className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 disabled:opacity-50"><Download size={15} /> Descargar Excel</button>
+          {hasFilters && <button onClick={() => setFilters({ search: '', type: '', category: '', method: '', showDeleted: false })} className="rounded-lg px-3 py-2 text-xs font-bold text-primary-700 hover:bg-primary-50">Limpiar filtros</button>}
         </div>
-      </div>
+        {hasFilters && <div role="status" className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-primary-100 bg-primary-50/60 px-3 py-2.5 text-xs"><span className="font-semibold text-gray-600">Activos de esta vista</span><span className="font-bold tabular-nums text-primary-700">Ingresos {money(filteredSummary.income)}</span><span className="font-bold tabular-nums text-rose-700">Egresos {money(filteredSummary.expense)}</span><span className="font-bold tabular-nums text-gray-900">Neto {money(filteredSummary.balance)}</span></div>}
+      </section>
 
       {/* Entries table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -421,7 +357,7 @@ export function CashRegisterPage() {
             const first = group.entries[0];
             const total = group.total ?? group.entries.reduce((s, e) => s + e.amount, 0);
             const baseDesc = first.description.replace(/\s*\(\d+ de \d+\)\s*$/, '').replace(/\s*\[.*?\]\s*$/, '');
-            const methodMatch = first.description.match(/\[(.+?)\]/);
+            const groupMethod = [...new Set(group.entries.map(entryPaymentMethod).filter(Boolean))].join(' + ');
             const toggle = () => setExpandedGroups(prev => { const next = new Set(prev); next.has(group.groupId!) ? next.delete(group.groupId!) : next.add(group.groupId!); return next; });
 
             return (
@@ -452,9 +388,9 @@ export function CashRegisterPage() {
                     </span>
                     <span className="text-sm text-gray-700 truncate">{baseDesc}</span>
                   </div>
-                  {methodMatch && (
+                  {groupMethod && (
                     <div className="mt-1.5">
-                      <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{methodMatch[1]}</span>
+                      <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{groupMethod}</span>
                     </div>
                   )}
                 </div>
@@ -487,7 +423,7 @@ export function CashRegisterPage() {
                 const first = group.entries[0];
                 const total = group.total ?? group.entries.reduce((s, e) => s + e.amount, 0);
                 const baseDesc = first.description.replace(/\s*\(\d+ de \d+\)\s*$/, '').replace(/\s*\[.*?\]\s*$/, '');
-                const methodMatch = first.description.match(/\[(.+?)\]/);
+                const groupMethod = [...new Set(group.entries.map(entryPaymentMethod).filter(Boolean))].join(' + ');
 
                 return (
                   <React.Fragment key={group.groupId}>
@@ -515,7 +451,7 @@ export function CashRegisterPage() {
                         <span className="text-sm text-gray-700">{baseDesc}</span>
                       </td>
                       <td className="px-4 py-3">
-                        {methodMatch ? <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{methodMatch[1]}</span> : <span className="text-gray-300 text-xs">—</span>}
+                        {groupMethod ? <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{groupMethod}</span> : <span className="text-gray-300 text-xs">—</span>}
                       </td>
                       <td className={`px-4 py-3 text-right font-bold text-sm ${first.type === 'INCOME' ? 'text-primary-700' : 'text-red-600'}`}>
                         <span className="text-xs font-normal opacity-60 mr-0.5">{first.type === 'INCOME' ? '+' : '−'}</span>
@@ -528,7 +464,7 @@ export function CashRegisterPage() {
                   </React.Fragment>
                 );
               })}
-              {entries.length === 0 && (
+              {filteredEntries.length === 0 && (
                 <tr>
                   <td colSpan={isClosed ? 6 : 7} className="px-4 py-16 text-center">
                     <Receipt size={36} className="mx-auto mb-2 text-gray-200" />

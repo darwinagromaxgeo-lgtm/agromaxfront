@@ -71,3 +71,51 @@
 .billing-sheet-ticket .billing-sheet-notice { font-size: 12px; margin-bottom: 8px; }
 .billing-sheet-ticket .billing-sheet-hash { font-size: 12px; }
 .billing-sheet-ticket .billing-sheet-thanks { font-size: 14px; margin: 8px 0 3px; }
+
+/* Internal sale notes: the A4 layout mirrors the commercial PDF. */
+.sale-note-paper { width: 794px; min-height: 1123px; padding: 34px 34px 26px; display: flex; flex-direction: column; font-size: 11px; line-height: 1.4; color: #111827; }
+.sale-note-header { display: grid; grid-template-columns: 170px minmax(0, 1fr) 230px; gap: 14px; align-items: start; margin-bottom: 25px; }
+.sale-note-paper .sale-note-logo { width: 165px; margin-top: 12px; }
+.sale-note-company { padding-top: 8px; }
+.sale-note-company h3 { font-size: 19px; margin-bottom: 8px; line-height: 1.2; }
+.sale-note-company p { font-size: 11px; margin-bottom: 4px; }
+.sale-note-reference { border: 1px solid #08883d; text-align: center; }
+.sale-note-reference p, .sale-note-reference strong { display: block; padding: 9px 6px; font-size: 13px; font-weight: 700; }
+.sale-note-reference h2 { margin: 0; padding: 9px 6px; background: #08883d; color: white; font-size: 17px; line-height: 1.4; }
+.sale-note-paper h4 { margin: 10px 0 6px; font-size: 12px; font-weight: 700; }
+.sale-note-client { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #94a3b8; margin: 0 0 8px; }
+.sale-note-client div { display: flex; gap: 9px; padding: 4px 7px; min-width: 0; }
+.sale-note-client dt { min-width: 100px; font-weight: 700; }
+.sale-note-client dd, .sale-note-payments dd, .sale-note-totals dd { margin: 0; }
+.sale-note-client .sale-note-wide { grid-column: 1 / -1; }
+.sale-note-items { width: 100%; border-collapse: collapse; border: 1px solid #94a3b8; font-size: 11px; }
+.sale-note-items th { padding: 9px 5px; background: #08883d; color: white; font-size: 11px; font-weight: 700; }
+.sale-note-items th:first-child { width: 42px; white-space: nowrap; }
+.sale-note-items td { padding: 7px 5px; vertical-align: top; border-right: 1px solid #cbd5e1; }
+.sale-note-items td:first-child { width: 42px; text-align: center; }
+.sale-note-items td:nth-child(2) { width: 42%; }
+.sale-note-items th:nth-child(n+3), .sale-note-items td:nth-child(n+3) { text-align: right; white-space: nowrap; }
+.sale-note-items .sale-note-blank td { height: 24px; padding: 3px; }
+.sale-note-paper .sale-note-words { margin: 16px 2px 22px; font-size: 11px; }
+.sale-note-bottom { display: grid; grid-template-columns: 1fr 265px; align-items: start; gap: 16px; }
+.sale-note-bottom h4 { margin-top: 0; }
+.sale-note-payments, .sale-note-totals { margin: 0; border: 1px solid #94a3b8; }
+.sale-note-payments div, .sale-note-totals div { display: flex; justify-content: space-between; gap: 8px; padding: 6px; border-bottom: 1px solid #e2e8f0; }
+.sale-note-payments dd, .sale-note-totals dd { white-space: nowrap; }
+.sale-note-payment-title { background: #dcfce7; font-weight: 700; }
+.sale-note-pending { color: #9a3412; font-weight: 700; }
+.sale-note-credit-help { margin-top: 6px !important; font-size: 9px; color: #475569; }
+.sale-note-totals dt { font-weight: 700; }
+.sale-note-totals div { background: #f0fdf4; }
+.sale-note-totals .sale-note-total { font-size: 13px; font-weight: 700; background: #dcfce7; padding: 9px 6px; }
+.sale-note-accounts { margin-top: 20px; }
+.sale-note-accounts h4 { text-align: center; }
+.sale-note-accounts table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.sale-note-accounts th, .sale-note-accounts td { border: 1px solid #94a3b8; padding: 5px; text-align: center; }
+.sale-note-accounts th { background: #dcfce7; }
+.sale-note-footer { margin-top: auto; padding-top: 28px; text-align: center; font-size: 9px; color: #475569; }
+.sale-note-footer p + p { margin-top: 12px; }
+.sale-note-cancelled { margin-bottom: 10px !important; padding: 10px; color: #b91c1c; border: 1px solid #fecaca; text-align: center; font-size: 17px; font-weight: 700; }
+.billing-sheet-note-payments { margin: 10px 0; padding-top: 8px; border-top: 1px dashed #000; }
+.billing-sheet-note-payments p { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+.billing-sheet-note-payments small { display: block; font-size: 11px; margin-top: 5px; }

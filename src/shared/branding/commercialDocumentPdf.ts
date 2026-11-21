@@ -36,15 +36,22 @@ export function commercialTaxTotals(items: CommercialItem[]) {
   return Object.fromEntries(Object.entries(cents).map(([key, value]) => [key, value / 100])) as Record<keyof typeof cents, number>;
 }
 
+/** These amounts describe payments recorded with the original sale, not later credit collections. */
+export function commercialPaymentTotals(total: number, payments: { amount: number }[] = []) {
+  const paid = payments.reduce((sum, payment) => sum + Math.round(payment.amount * 100), 0);
+  return { paid: paid / 100, pending: Math.max(0, Math.round(total * 100) - paid) / 100 };
+}
+
 export function buildCommercialDocument(params: CommercialDocumentParams): any {
   const { company, client, vendor, items, total, kind } = params;
   const quotation = kind === 'QUOTE', currency = params.currency || 'PEN', symbol = currency === 'USD' ? 'US$' : 'S/';
   const title = quotation ? 'COTIZACIÓN' : 'NOTA DE VENTA';
   const totals = commercialTaxTotals(items);
   const accounts = (company?.bankAccounts || []).filter(account => account.isActive);
+  const initialPayments = commercialPaymentTotals(total, params.payments);
   const itemRows: any[][] = items.map((item, index) => [
     { text: String(index + 1), alignment: 'center' }, { text: item.description },
-    { text: item.quantity.toFixed(2), alignment: 'right' }, { text: item.unit || 'UND', alignment: 'center' },
+    { text: item.quantity.toLocaleString('es-PE', { maximumFractionDigits: 6 }), alignment: 'right' }, { text: item.unit || 'UND', alignment: 'center' },
     { text: item.unitPrice.toFixed(2), alignment: 'right' }, { text: item.subtotal.toFixed(2), alignment: 'right' },
   ]);
   while (itemRows.length < 6) itemRows.push(Array.from({ length: 6 }, () => ({ text: ' ' })));
@@ -68,7 +75,7 @@ export function buildCommercialDocument(params: CommercialDocumentParams): any {
         ] },
         { width: 176, table: { widths: ['*'], body: [
           [{ text: `R.U.C. ${company?.ruc || '—'}`, alignment: 'center', bold: true, fontSize: 10, margin: [0, 5, 0, 5] }],
-          [{ text: title, fillColor: LIGHT_GREEN, alignment: 'center', bold: true, fontSize: 13, margin: [0, 5, 0, 5] }],
+          [{ text: title, fillColor: quotation ? LIGHT_GREEN : GREEN, color: quotation ? '#111827' : '#ffffff', alignment: 'center', bold: true, fontSize: 13, margin: [0, 5, 0, 5] }],
           [{ text: params.reference, alignment: 'center', bold: true, fontSize: 10.5, margin: [0, 5, 0, 5] }],
         ] }, layout: { ...lines, hLineColor: () => GREEN, vLineColor: () => GREEN } },
       ], columnGap: 10, margin: [0, 0, 0, 20] },
@@ -77,10 +84,12 @@ export function buildCommercialDocument(params: CommercialDocumentParams): any {
       { table: { widths: [72, 5, '*', 78, 5, 108], body: [
         [...pair('Cliente', client?.name), {}, {}, {}].map((cell, index) => index === 2 ? { ...cell, colSpan: 4 } : cell),
         [...pair('R.U.C. / D.N.I.', client?.documentNumber), {}, {}, {}].map((cell, index) => index === 2 ? { ...cell, colSpan: 4 } : cell),
-        [...pair('Dirección', client?.address), ...pair('Vendedor', vendor?.name || 'Área de Ventas')],
-        [...pair('Contacto', undefined), ...pair('Teléfono', vendor?.phone || company?.phone)],
-        [...pair('Teléfono', client?.phone), ...pair('E-mail', vendor?.email)],
-        [...pair('E-mail', client?.email), ...pair('Moneda', currency === 'USD' ? 'USD — Dólares' : 'PEN — Soles')],
+        [...pair('Dirección', client?.address), ...pair(quotation ? 'Vendedor' : 'Moneda', quotation ? vendor?.name || 'Área de Ventas' : currency === 'USD' ? 'USD — Dólares' : 'PEN — Soles')],
+        ...(quotation ? [
+          [...pair('Contacto', undefined), ...pair('Teléfono', vendor?.phone || company?.phone)],
+          [...pair('Teléfono', client?.phone), ...pair('E-mail', vendor?.email)],
+          [...pair('E-mail', client?.email), ...pair('Moneda', currency === 'USD' ? 'USD — Dólares' : 'PEN — Soles')],
+        ] : []),
         [...pair('Fecha Emisión', date(params.issuedAt)), ...pair(quotation ? 'Venc. cotización' : 'Condición de venta', quotation ? date(params.validUntil) : params.paymentCondition || 'CONTADO')],
       ] }, layout: { ...lines, paddingTop: () => 2, paddingBottom: () => 2 } },
       ...(quotation ? [
@@ -88,18 +97,20 @@ export function buildCommercialDocument(params: CommercialDocumentParams): any {
         { text: 'Reciba nuestro más cordial saludo, a la vez, aprovechamos en hacer llegar la cotización solicitada.', fontSize: 8, margin: [2, 0, 0, 7] },
       ] : [{ text: 'DETALLE DE LA VENTA', bold: true, margin: [2, 12, 0, 6] }]),
       { table: { headerRows: 1, dontBreakRows: true, widths: [26, '*', 42, 42, 56, 60], body: [
-        ['ÍTEM', 'DESCRIPCIÓN', 'CANT.', 'U.M.', 'P. UNIT.', 'IMPORTE'].map(text => ({ text, fillColor: LIGHT_GREEN, bold: true, alignment: 'center', fontSize: 8.5 })), ...itemRows,
+        ['ÍTEM', 'DESCRIPCIÓN', 'CANT.', 'U.M.', 'P. UNIT.', 'IMPORTE'].map(text => ({ text, fillColor: quotation ? LIGHT_GREEN : GREEN, color: quotation ? '#111827' : '#ffffff', bold: true, alignment: 'center', fontSize: 8.5 })), ...itemRows,
       ] }, layout: { ...lines, hLineWidth: (index: number, node: any) => index === 0 || index === 1 || index === node.table.body.length ? .6 : 0, paddingTop: () => 4, paddingBottom: () => 4 } },
       { text: [{ text: 'SON: ', bold: true }, { text: numberToWords(total, currency) }], fontSize: 8, margin: [2, 13, 0, 17] },
       { columns: [
         { width: '*', stack: [
-          { text: quotation ? 'CONDICIONES COMERCIALES' : 'CONDICIONES DE VENTA', bold: true, fontSize: 9, margin: [2, 0, 0, 6] },
+          { text: quotation ? 'CONDICIONES COMERCIALES' : 'CONDICIÓN Y PAGOS REGISTRADOS', bold: true, fontSize: 9, margin: [2, 0, 0, 6] },
           { table: { widths: [106, 5, '*'], body: [
             pair('Condición de Venta', params.paymentCondition || 'CONTADO'),
             ...(quotation ? [pair('Tiempo de Entrega', 'INMEDIATO'), pair('Lugar de Entrega', client?.address)] : []),
             ...(params.notes ? [pair('Observaciones', params.notes)] : []),
             ...(!quotation && params.payments?.length ? params.payments.map(payment => pair(payment.paymentMethodName, `${symbol} ${payment.amount.toFixed(2)}`)) : []),
+            ...(!quotation && params.paymentCondition === 'CREDITO' ? [pair('Abono inicial', `${symbol} ${initialPayments.paid.toFixed(2)}`), pair('Saldo inicial', `${symbol} ${initialPayments.pending.toFixed(2)}`)] : []),
           ] }, layout: lines },
+          ...(!quotation && params.paymentCondition === 'CREDITO' ? [{ text: 'Los abonos posteriores y el saldo actual se consultan en Créditos.', fontSize: 7, margin: [2, 5, 0, 0], color: '#475569' }] : []),
         ] },
         { width: 200, table: { widths: ['*', 27, 62], body: [
           totalRow('OP. GRAVADAS', totals.taxable), totalRow('OP. EXONERADAS', totals.exempt),
@@ -108,7 +119,7 @@ export function buildCommercialDocument(params: CommercialDocumentParams): any {
           totalRow('I.G.V.', totals.tax), totalRow('IMPORTE TOTAL', total, true),
         ] }, layout: lines },
       ], columnGap: 12, margin: [0, 0, 0, 17] },
-      ...(quotation && accounts.length ? [
+      ...(accounts.length ? [
         { text: 'FORMAS DE PAGO', alignment: 'center', fontSize: 9, bold: true, margin: [0, 5, 0, 5] },
         { table: { headerRows: 1, dontBreakRows: true, widths: [88, 113, 124, '*'], body: [
           ['', 'Cuenta:', 'CCI:', 'Titular:'].map(text => ({ text, bold: true, alignment: 'center', fillColor: LIGHT_GREEN })),

@@ -112,6 +112,17 @@ test('cash history lets sellers reconcile their open register and keeps accounta
  assert.equal(seller.writes.length,0);assert.equal(accountant.writes.length,0);
 });
 
+test('movement filters show their active subtotal, keep the complete cash total and reset without mutations',async t=>{
+ const register={id,date:'2026-11-21',openingBalance:100,status:'OPEN',entries:[{id:'a',description:'Cobro por Yape',amount:12.75,type:'INCOME',category:'SALE',paymentMethodName:'Yape',voucherType:'NONE',isDeleted:false,editHistory:[]},{id:'b',description:'Cobro en efectivo',amount:20,type:'INCOME',category:'SALE',paymentMethodName:'Efectivo',voucherType:'NONE',isDeleted:false,editHistory:[]}]};
+ const h=await mount(t,'modules/cash-register/pages/CashRegisterPage','ADMIN','/',null,register);
+ const method=h.tree.root.findAllByType('select').find(select=>select.findAllByType('option').some(option=>option.props.value==='yape'));
+ assert.ok(method);await act(async()=>method.props.onChange({target:{value:'yape'}}));
+ const status=h.tree.root.findByProps({role:'status'});assert.ok(text(status).includes('Ingresos S/ 12.75'));assert.ok(text(status).includes('Neto S/ 12.75'));
+ assert.ok(text(h.tree.root).includes('S/ 120.00'),'The drawer total still includes all cash movements and its opening');
+ const reset=h.tree.root.findAllByType('button').find(button=>text(button)==='Limpiar filtros');assert.ok(reset);await act(async()=>reset.props.onClick());
+ assert.equal(h.tree.root.findAllByProps({role:'status'}).length,0);assert.equal(method.props.value,'');assert.equal(h.writes.length,0);
+});
+
 for(const status of ['DRAFT','ACCEPTED','PENDING'])test('accounting receipt detail keeps files and blocks operations for '+status,async t=>{
  const receipt={id,branchId:id,saleId:id,documentType:'BOLETA',taxType:'GRAVADO',status,series:'B001',number:1,issuer:{name:'Emisor',documentNumber:'20600000001'},receiver:{name:'Cliente',documentType:'UNIDENTIFIED'},items:[],warnings:[],taxableAmount:29.66,exemptAmount:0,unaffectedAmount:0,taxAmount:5.34,total:35,hasPdf:true,hasXml:true,hasCdr:status==='ACCEPTED',paymentCondition:'CONTADO'};
  const h=await mount(t,'modules/billing/pages/BillingPage','CONTABILIDAD','/billing?documentId='+id,receipt);
