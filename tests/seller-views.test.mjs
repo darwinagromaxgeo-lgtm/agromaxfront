@@ -5,10 +5,10 @@ import { loadTs } from './helpers/loadTs.mjs';
 
 const { roleHome, canAccessView } = loadTs(fileURLToPath(new URL('../src/shared/utils/accessPolicy.ts', import.meta.url)));
 
-test('any seller starts in POS and accesses cash, sales, quotations and customers', () => {
+test('any seller starts in POS and accesses cash, credits, sales, quotations and customers', () => {
   assert.equal(roleHome('VENDEDOR'), '/pos');
-  for (const path of ['/', '/pos', '/sales', '/quotes', '/clients', '/cash-register', '/cash-register/history']) assert.equal(canAccessView('VENDEDOR', path), true, path);
-  for (const path of ['/dashboard', '/products', '/purchases', '/purchases/new', '/stock', '/stock-requests', '/kardex', '/cash-register/settings', '/credits', '/accounts-payable', '/billing', '/invoices', '/categories', '/units', '/companies', '/price-tiers', '/admin', '/users', '/branches', '/pos-administration']) assert.equal(canAccessView('VENDEDOR', path), false, path);
+  for (const path of ['/', '/pos', '/sales', '/quotes', '/clients', '/cash-register', '/cash-register/history', '/credits', '/credits/', '/credits/client/000000000000000000000001']) assert.equal(canAccessView('VENDEDOR', path), true, path);
+  for (const path of ['/dashboard', '/products', '/purchases', '/purchases/new', '/stock', '/stock-requests', '/kardex', '/cash-register/settings', '/credits/new', '/credits/payments', '/credits/client/invalid', '/credits/client/000000000000000000000001/edit', '/accounts-payable', '/billing', '/invoices', '/categories', '/units', '/companies', '/price-tiers', '/admin', '/users', '/branches', '/pos-administration']) assert.equal(canAccessView('VENDEDOR', path), false, path);
   assert.equal(canAccessView(undefined, '/pos'), false);
 });
 

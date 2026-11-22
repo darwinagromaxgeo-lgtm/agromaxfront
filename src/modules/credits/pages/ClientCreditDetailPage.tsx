@@ -95,7 +95,7 @@ export function ClientCreditDetailPage() {
         <h1 className="text-2xl font-bold text-gray-800">Creditos - {client?.name || 'Cliente'}</h1>
         <div className="ml-auto">
           {openCredits.length > 0 && (
-            <WriteAccess><button
+            <WriteAccess excludeRoles={['VENDEDOR']}><button
               onClick={() => setShowBatch(true)}
               className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-medium shadow-sm"
             >

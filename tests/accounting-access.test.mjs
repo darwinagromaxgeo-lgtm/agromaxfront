@@ -10,7 +10,7 @@ import ts from 'typescript';
 import { loadTs } from './helpers/loadTs.mjs';
 const require=createRequire(import.meta.url);
 const {QueryClient,QueryClientProvider}=require('@tanstack/react-query');
-const {MemoryRouter}=require('react-router-dom');
+const {MemoryRouter,Routes,Route}=require('react-router-dom');
 const base=fileURLToPath(new URL('../',import.meta.url));
 const policy=loadTs(path.join(base,'src/shared/utils/accessPolicy.ts'));
 const text=node=>typeof node==='string'||typeof node==='number'?String(node):(node?.children||[]).map(text).join('');
@@ -24,10 +24,10 @@ test('accounting navigation includes consultation and excludes creation, editing
  assert.equal(policy.accessRole({role:'ALMACENERO',branchAssignments:[{branchId:id,role:'CONTABILIDAD'}]},id),'CONTABILIDAD');
 });
 
-async function mount(t,relative,role='CONTABILIDAD',initialRoute='/',receipt=null,cashRegister=null){
+async function mount(t,relative,role='CONTABILIDAD',initialRoute='/',receipt=null,cashRegister=null,credits=[]){
  const reads=[],writes=[],downloads=[];const auth={user:{role,branchAssignments:[{branchId:id,role}]},selectedBranch:{id,name:'Sausal',companyIds:[id],defaultCompanyId:id}};
  const wrap=data=>({data:{data}});
- const api={get:async route=>{reads.push(route);if(route==='/companies')return wrap([{id,name:'Empresa de prueba',ruc:'20600000001',isActive:true}]);if(['/categories','/units','/price-tiers','/payment-methods','/payment-agreements','/product-lots','/product-lots/expiring'].includes(route)||route.startsWith('/stock/alerts/'))return wrap([]);if(route==='/cash-registers/today')return wrap(cashRegister);if(route==='/cash-registers')return wrap({data:cashRegister?[cashRegister]:[],total:cashRegister?1:0});if(route==='/cash-registers/'+id)return wrap(cashRegister);if(receipt && route==='/billing/documents')return wrap({data:[receipt],total:1});if(receipt && route==='/billing/documents/'+receipt.id)return wrap(receipt);if(route==='/billing/status')return wrap({ready:true,environment:'beta',supportedDocumentTypes:['FACTURA','BOLETA'],creditNotes:{ready:true}});if(route==='/accounts-payable/alerts')return wrap({overdue:[],upcoming:[]});return wrap({data:[],total:0});}};
+ const api={get:async route=>{reads.push(route);if(route==='/clients'&&credits.length)return wrap({data:[{id,name:'Cliente con crédito',isActive:true}],total:1});if(route==='/credits'||route==='/credits/client/'+id)return wrap({data:credits,total:credits.length});if(route==='/credits/'+id)return wrap(credits.find(credit=>credit.id===id));if(route==='/companies')return wrap([{id,name:'Empresa de prueba',ruc:'20600000001',isActive:true}]);if(['/categories','/units','/price-tiers','/payment-methods','/payment-agreements','/product-lots','/product-lots/expiring'].includes(route)||route.startsWith('/stock/alerts/'))return wrap([]);if(route==='/cash-registers/today')return wrap(cashRegister);if(route==='/cash-registers')return wrap({data:cashRegister?[cashRegister]:[],total:cashRegister?1:0});if(route==='/cash-registers/'+id)return wrap(cashRegister);if(receipt && route==='/billing/documents')return wrap({data:[receipt],total:1});if(receipt && route==='/billing/documents/'+receipt.id)return wrap(receipt);if(route==='/billing/status')return wrap({ready:true,environment:'beta',supportedDocumentTypes:['FACTURA','BOLETA'],creditNotes:{ready:true}});if(route==='/accounts-payable/alerts')return wrap({overdue:[],upcoming:[]});return wrap({data:[],total:0});}};
  for(const method of ['post','put','patch','delete'])api[method]=async(...args)=>{writes.push([method,...args]);throw Error('Unexpected mutation');};
  const cache=new Map();
  const load=filename=>{
@@ -52,7 +52,7 @@ async function mount(t,relative,role='CONTABILIDAD',initialRoute='/',receipt=nul
  };
  const filename=path.join(base,'src/'+relative+'.tsx'),name=path.basename(relative);const Component=load(filename)[name];
  const client=new QueryClient({defaultOptions:{queries:{retry:false,gcTime:Infinity},mutations:{retry:false,gcTime:Infinity}}});let tree;
- await act(async()=>{tree=TestRenderer.create(React.createElement(MemoryRouter,{initialEntries:[initialRoute]},React.createElement(QueryClientProvider,{client},React.createElement(Component))));});
+ await act(async()=>{tree=TestRenderer.create(React.createElement(MemoryRouter,{initialEntries:[initialRoute]},React.createElement(QueryClientProvider,{client},name==='ClientCreditDetailPage'?React.createElement(Routes,{},React.createElement(Route,{path:'/credits/client/:clientId',element:React.createElement(Component)})):React.createElement(Component))));});
  const settle=async()=>{for(let i=0;i<5;i++)await act(async()=>{await new Promise(r=>setTimeout(r,5));});};await settle();
  t.after(()=>{act(()=>tree.unmount());client.clear();});
  return {tree,reads,writes,downloads,settle,buttons:()=>tree.root.findAllByType('button').map(text)};
@@ -149,4 +149,31 @@ test('an accountant downloads filtered cash movements as Excel without changing 
  assert.equal(rows.length,1);assert.equal(rows[0]['Descripción'],'Cobro de maíz');assert.equal(rows[0]['Monto S/'],12.75);
  for(const label of h.buttons())assert.doesNotMatch(label,/Abrir Caja|Ingreso|Egreso|Ajuste|Cerrar Caja/);
  assert.equal(h.writes.length,0);assert.equal(register.entries.length,3);
+});
+
+
+test('sellers consult credit balances, individual detail and client history without write actions',async t=>{
+ const credit={id,branchId:id,clientId:id,name:'Campaña de prueba',saleIds:[],saleDetails:[],totalAmount:118,paidAmount:18,pendingAmount:100,status:'PARTIAL',createdAt:'2026-11-22T12:00:00Z',payments:[{id,amount:18,paymentDate:'2026-11-22T13:00:00Z',paymentMethodName:'Efectivo',receivedByName:'Administrador'}]};
+ const h=await mount(t,'modules/credits/pages/CreditsPage','VENDEDOR','/credits',null,null,[credit]);
+ assert.ok(h.reads.includes('/credits')); assert.ok(text(h.tree.root).includes('Cliente con crédito')); assert.ok(text(h.tree.root).includes('100.00'));
+ await act(async()=>h.tree.root.findByProps({role:'button',tabIndex:0}).props.onClick());await h.settle();
+ for(const label of h.buttons())assert.doesNotMatch(label,/Registrar abono|Editar|Eliminar/);
+ assert.equal(h.tree.root.findAllByType('button').some(button=>/Editar crédito|Eliminar crédito/.test(button.props.title||'')),false);
+ const detail=h.tree.root.findAllByType('button').find(button=>button.props.title==='Ver detalle');assert.ok(detail);
+ await act(async()=>detail.props.onClick());await h.settle();
+ assert.ok(h.reads.includes('/credits/'+id));assert.ok(text(h.tree.root).includes('Historial de abonos'));assert.ok(text(h.tree.root).includes('Administrador'));
+ assert.equal(h.tree.root.findAllByType('button').some(button=>button.props.title==='Descargar PDF detallado'),true);
+ const history=await mount(t,'modules/credits/pages/ClientCreditDetailPage','VENDEDOR','/credits/client/'+id,null,null,[credit]);
+ assert.ok(history.reads.includes('/credits/client/'+id));assert.ok(text(history.tree.root).includes('Cliente con crédito'));assert.ok(text(history.tree.root).includes('Campaña de prueba'));assert.ok(text(history.tree.root).includes('100.00'));
+ for(const label of history.buttons())assert.doesNotMatch(label,/Registrar abono|Editar|Eliminar/);
+ assert.equal(h.writes.length,0);assert.equal(history.writes.length,0);
+});
+
+test('administrators retain credit collection and editing actions',async t=>{
+ const credit={id,branchId:id,clientId:id,name:'Campaña',saleIds:[],saleDetails:[],totalAmount:118,paidAmount:18,pendingAmount:100,status:'PARTIAL',createdAt:'2026-11-22T12:00:00Z',payments:[]};
+ const h=await mount(t,'modules/credits/pages/CreditsPage','ADMIN','/credits',null,null,[credit]);
+ assert.ok(h.buttons().some(label=>label.includes('Registrar abono')));
+ await act(async()=>h.tree.root.findByProps({role:'button',tabIndex:0}).props.onClick());await h.settle();
+ const buttons=h.tree.root.findAllByType('button');assert.ok(buttons.some(button=>button.props.title==='Editar crédito'));assert.ok(buttons.some(button=>button.props.title==='Eliminar crédito'));
+ assert.equal(h.writes.length,0);
 });

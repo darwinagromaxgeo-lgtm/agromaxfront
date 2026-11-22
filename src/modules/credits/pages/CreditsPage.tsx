@@ -247,7 +247,7 @@ export function CreditsPage() {
                     {/* Actions — stop propagation */}
                     <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       {group.pendingAmount > 0 && (
-                        <WriteAccess><button
+                        <WriteAccess excludeRoles={['VENDEDOR']}><button
                           onClick={() => openBatchForGroup(group)}
                           className="flex items-center gap-1 px-2.5 py-1.5 bg-primary-600 text-white text-xs font-semibold rounded-lg hover:bg-primary-700 transition-colors"
                         >
@@ -301,16 +301,16 @@ export function CreditsPage() {
                                 </div>
                               </div>
                               <div className="flex gap-2">
-                                <button onClick={() => openDetail(c)} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-md font-medium transition-colors">
+                                <button title="Ver detalle" onClick={() => openDetail(c)} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-md font-medium transition-colors">
                                   <Eye size={12} /> Ver
                                 </button>
-                                <button onClick={() => handleDownloadCreditPdf(c)} disabled={pdfLoadingId === c.id} className="px-2.5 py-1.5 text-gray-500 hover:text-primary-600 bg-gray-50 hover:bg-gray-100 rounded-md disabled:opacity-50 transition-colors">
+                                <button title="Descargar PDF detallado" onClick={() => handleDownloadCreditPdf(c)} disabled={pdfLoadingId === c.id} className="px-2.5 py-1.5 text-gray-500 hover:text-primary-600 bg-gray-50 hover:bg-gray-100 rounded-md disabled:opacity-50 transition-colors">
                                   {pdfLoadingId === c.id ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
                                 </button>
-                                <WriteAccess><button onClick={() => openEdit(c)} className="px-2.5 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
+                                <WriteAccess excludeRoles={['VENDEDOR']}><button title="Editar crédito" onClick={() => openEdit(c)} className="px-2.5 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
                                   <Edit2 size={13} />
                                 </button></WriteAccess>
-                                <WriteAccess><button onClick={() => openDelete(c)} className="px-2.5 py-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors">
+                                <WriteAccess excludeRoles={['VENDEDOR']}><button title="Eliminar crédito" onClick={() => openDelete(c)} className="px-2.5 py-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors">
                                   <Trash2 size={13} />
                                 </button></WriteAccess>
                               </div>
@@ -346,12 +346,12 @@ export function CreditsPage() {
                                   <td className="py-2 pr-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cst.class}`}>{cst.label}</span></td>
                                   <td className="py-2 pr-3">
                                     <div className="flex items-center gap-2">
-                                      <button onClick={() => openDetail(c)} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-md font-medium"><Eye size={12} /> Ver</button>
-                                      <button onClick={() => handleDownloadCreditPdf(c)} disabled={pdfLoadingId === c.id} className="text-gray-500 hover:text-primary-600 disabled:opacity-50">
+                                      <button title="Ver detalle" onClick={() => openDetail(c)} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-md font-medium"><Eye size={12} /> Ver</button>
+                                      <button title="Descargar PDF detallado" onClick={() => handleDownloadCreditPdf(c)} disabled={pdfLoadingId === c.id} className="text-gray-500 hover:text-primary-600 disabled:opacity-50">
                                         {pdfLoadingId === c.id ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
                                       </button>
-                                      <WriteAccess><button onClick={() => openEdit(c)} className="text-blue-600 hover:text-blue-800"><Edit2 size={13} /></button></WriteAccess>
-                                      <WriteAccess><button onClick={() => openDelete(c)} className="text-red-600 hover:text-red-800"><Trash2 size={13} /></button></WriteAccess>
+                                      <WriteAccess excludeRoles={['VENDEDOR']}><button title="Editar crédito" onClick={() => openEdit(c)} className="text-blue-600 hover:text-blue-800"><Edit2 size={13} /></button></WriteAccess>
+                                      <WriteAccess excludeRoles={['VENDEDOR']}><button title="Eliminar crédito" onClick={() => openDelete(c)} className="text-red-600 hover:text-red-800"><Trash2 size={13} /></button></WriteAccess>
                                     </div>
                                   </td>
                                 </tr>

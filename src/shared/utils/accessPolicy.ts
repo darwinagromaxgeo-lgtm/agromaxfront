@@ -25,5 +25,5 @@ export function canAccessView(role: string | undefined, pathname: string): boole
   if (!role) return false;
   if (role === 'CONTABILIDAD') return pathname === '/' || ACCOUNTING_VIEWS.some(pattern => pattern.test(pathname));
   if (role !== 'VENDEDOR') return true;
-  return pathname === '/' || /^\/cash-register(?:\/history)?\/?$/.test(pathname) || SELLER_VIEWS.some(path => pathname === path || pathname.startsWith(path + '/'));
+  return pathname === '/' || /^\/cash-register(?:\/history)?\/?$/.test(pathname) || /^\/credits(?:\/client\/[a-f\d]{24})?\/?$/i.test(pathname) || SELLER_VIEWS.some(path => pathname === path || pathname.startsWith(path + '/'));
 }
