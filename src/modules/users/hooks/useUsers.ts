@@ -1,9 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { userService } from '../services/userService';
 import toast from 'react-hot-toast';
+import { userError } from '../utils/userError';
 
-export function useUsers(params?: any) {
-  return useQuery({ queryKey: ['users', params], queryFn: () => userService.getAll(params) });
+export function useUsers(params?: any, enabled = true) {
+  return useQuery({ queryKey: ['users', params], enabled, queryFn: () => userService.getAll(params) });
 }
 
 export function useCreateUser() {
@@ -11,7 +12,7 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: userService.create,
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); toast.success('Usuario creado'); },
-    onError: (err: any) => toast.error(err.response?.data?.message || 'Error al crear usuario'),
+    onError: (err: any) => toast.error(userError(err, 'Error al crear usuario')),
   });
 }
 
@@ -20,7 +21,7 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => userService.update(id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); toast.success('Usuario actualizado'); },
-    onError: (err: any) => toast.error(err.response?.data?.message || 'Error al actualizar usuario'),
+    onError: (err: any) => toast.error(userError(err, 'Error al actualizar usuario')),
   });
 }
 
