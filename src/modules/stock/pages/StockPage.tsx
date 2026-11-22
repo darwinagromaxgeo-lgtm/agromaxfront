@@ -1,5 +1,6 @@
 import { WriteAccess } from '../../../shared/components/WriteAccess';
 import React, { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { useStock, useStockAlerts, useTransferStock } from '../hooks/useStock';
 import { useStockAdjustments, useCreateStockAdjustment } from '../hooks/useStockAdjustments';
 import { useProductLots, useExpiringLots } from '../hooks/useProductLots';
@@ -23,7 +24,7 @@ import { stockAdjustmentLabel } from '../utils/stockAdjustment';
 type ImportRow = { excelName: string; quantity: number; matched: Product | null };
 
 export function StockPage() {
-  const { selectedBranch } = useAuth();
+  const { user, selectedBranch } = useAuth();
   const [activeTab, setActiveTab] = useState<'inventory' | 'lots' | 'adjustments' | 'transfers'>('inventory');
   const [page, setPage] = useState(1);
   const [companyId, setCompanyId] = useState('');
@@ -355,8 +356,9 @@ export function StockPage() {
                 <ClipboardList size={15} /> Conteo de stock
               </button></WriteAccess>
               <WriteAccess><button onClick={openTransfer} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors shadow-sm whitespace-nowrap flex-shrink-0">
-                <ArrowRightLeft size={15} /> Transferir
+                <ArrowRightLeft size={15} /> Transferir entre empresas
               </button></WriteAccess>
+              {user?.role === 'ADMIN' && <WriteAccess><Link to="/stock-requests?tab=direct" className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary-600 px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"><ArrowRightLeft size={15} />Entre sucursales</Link></WriteAccess>}
             </>
           )}
         </div>
@@ -870,12 +872,14 @@ export function StockPage() {
           </div>
           <h3 className="text-lg font-semibold text-gray-700 mb-2">Transferencias entre sucursales</h3>
           <p className="text-gray-500 text-sm max-w-sm mx-auto mb-6">
-            Mueve productos entre empresas manteniendo la trazabilidad de lotes con asignación FIFO automática.
+            Mueve productos de una sede a otra con una confirmación directa y movimientos en el Kardex de ambas sucursales.
           </p>
+          {user?.role === 'ADMIN' && <Link to="/stock-requests?tab=direct" className="mb-5 inline-flex items-center gap-2 rounded-lg bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-700"><ArrowRightLeft size={16} />Transferencia directa entre sucursales</Link>}
+          <p className="mb-3 text-xs text-gray-500">Para mover stock entre empresas dentro de la misma sede:</p>
           <WriteAccess><button
             onClick={() => { setActiveTab('inventory'); setTimeout(openTransfer, 50); }}
             className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors shadow-sm">
-            <ArrowRightLeft size={16} /> Nueva Transferencia
+            <ArrowRightLeft size={16} /> Transferir entre empresas
           </button></WriteAccess>
         </div>
       )}

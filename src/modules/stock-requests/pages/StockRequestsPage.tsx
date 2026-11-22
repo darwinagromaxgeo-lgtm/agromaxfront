@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  ArrowRightLeft,
   Building2,
   Check,
   Clock3,
@@ -14,6 +15,7 @@ import {
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { Modal } from '../../../shared/components/Modal';
 import { SearchableSelect } from '../../../shared/components/SearchableSelect';
+import { DirectTransfersPanel } from '../components/DirectTransfersPanel';
 import type {
   BranchAvailability,
   Company,
@@ -37,7 +39,7 @@ import {
   useStockRequests,
 } from '../hooks/useStockRequests';
 
-type MainTab = 'availability' | 'requests';
+type MainTab = 'availability' | 'requests' | 'direct';
 type DirectionFilter = 'all' | 'incoming' | 'outgoing';
 
 const STATUS_LABELS: Record<StockRequestStatus, string> = {
@@ -75,7 +77,7 @@ function formatDate(value?: string) {
 
 export function StockRequestsPage() {
   const { user, selectedBranch } = useAuth();
-  const [mainTab, setMainTab] = useState<MainTab>('availability');
+  const [mainTab, setMainTab] = useState<MainTab>(() => user?.role === 'ADMIN' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'direct' ? 'direct' : 'availability');
   const [companyId, setCompanyId] = useState('');
   const [productId, setProductId] = useState('');
   const [consultedBranchId, setConsultedBranchId] = useState('');
@@ -233,7 +235,10 @@ export function StockRequestsPage() {
         >
           <Send size={16} /> Solicitudes
         </button>
+        {user?.role === 'ADMIN' && <button onClick={() => setMainTab('direct')} className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium ${mainTab === 'direct' ? 'border-primary-600 text-primary-700' : 'border-transparent text-gray-500'}`}><ArrowRightLeft size={16} />Transferencia directa</button>}
       </div>
+
+      {mainTab === 'direct' && user?.role === 'ADMIN' && <DirectTransfersPanel key={selectedBranch.id} companies={branchCompanies} products={products} initialCompanyId={companyId} />}
 
       {mainTab === 'availability' && (
         <div>
