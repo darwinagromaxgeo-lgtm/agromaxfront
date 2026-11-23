@@ -51,7 +51,7 @@ export function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get('page') || '1');
   const activeTab = (searchParams.get('tab') || 'active') as 'active' | 'inactive';
-  const sortOrder = (searchParams.get('sort') || '') as '' | 'asc' | 'desc';
+  const sortOrder = searchParams.get('sort') === 'desc' ? 'desc' : searchParams.get('sort') === 'recent' ? 'recent' : 'asc';
   const billingFilter = searchParams.get('billing') || '';
   const unitFilter = searchParams.get('unit') || '';
   const [search, setSearch] = useState(searchParams.get('q') || '');
@@ -82,7 +82,7 @@ export function ProductsPage() {
   const [lotForm, setLotForm] = useState({ companyId: '', lotNumber: '', expirationDate: '', quantity: '' });
 
   const queryClient = useQueryClient();
-  const { data, isLoading } = useProducts({ page, limit: 20, search: debouncedSearch, activeIngredient: debouncedIngredient || undefined, isActive: activeTab === 'active', supplier: debouncedSupplier || undefined, unit: unitFilter || undefined, sort: sortOrder || undefined, billingEnabled: billingFilter ? billingFilter === 'true' : undefined });
+  const { data, isLoading } = useProducts({ page, limit: 20, search: debouncedSearch, activeIngredient: debouncedIngredient || undefined, isActive: activeTab === 'active', supplier: debouncedSupplier || undefined, unit: unitFilter || undefined, sort: sortOrder === 'recent' ? undefined : sortOrder, billingEnabled: billingFilter ? billingFilter === 'true' : undefined });
   const { data: priceTiers } = usePriceTiers();
   const { data: categories } = useCategories();
   const { data: companies } = useCompanies();
@@ -712,7 +712,7 @@ export function ProductsPage() {
           >
             <SlidersHorizontal size={15} />
             {(() => {
-              const n = [activeIngredientFilter, supplierFilter, unitFilter, sortOrder, priceCompanyFilter, billingFilter].filter(Boolean).length;
+              const n = [activeIngredientFilter, supplierFilter, unitFilter, sortOrder !== 'asc', priceCompanyFilter, billingFilter].filter(Boolean).length;
               return n > 0 ? <span className={`text-xs font-bold ${showFilters ? 'text-white' : 'text-primary-600'}`}>{n}</span> : null;
             })()}
           </button>
@@ -733,10 +733,10 @@ export function ProductsPage() {
           </div>
           {/* Fila B: orden + unidad + empresa precios */}
           <div className="flex gap-2 flex-wrap sm:flex-nowrap">
-            <select value={sortOrder} onChange={(e) => setParams({ sort: e.target.value, page: '' })} className="flex-1 min-w-0 px-3 py-2 border rounded-lg text-sm">
-              <option value="">Más reciente</option>
+            <select aria-label="Orden de productos" value={sortOrder} onChange={(e) => setParams({ sort: e.target.value === 'asc' ? '' : e.target.value, page: '' })} className="flex-1 min-w-0 px-3 py-2 border rounded-lg text-sm">
               <option value="asc">Nombre A → Z</option>
               <option value="desc">Nombre Z → A</option>
+              <option value="recent">Más reciente</option>
             </select>
             <select aria-label="Habilitación de comprobantes" value={billingFilter} onChange={e => setParams({ billing: e.target.value, page: '' })} className="flex-1 min-w-0 px-3 py-2 border rounded-lg text-sm">
               <option value="">Todos los comprobantes</option>

@@ -50,8 +50,8 @@ export function StockPage() {
   const { data: companies } = useCompanies();
   const { data: categoriesData } = useCategories();
   const categories = Array.isArray(categoriesData) ? categoriesData : [];
-  const { data: productsData } = useProducts({ limit: 200 });
-  const { data: allProductsData } = useProducts({ limit: 1000 });
+  const { data: productsData } = useProducts({ limit: 200, sort: 'asc' });
+  const { data: allProductsData } = useProducts({ limit: 1000, sort: 'asc' });
   const { data, isLoading } = useStock(companyId, { page: 1, limit: 1000 });
   const { data: alerts } = useStockAlerts(companyId, 10);
   const transferStock = useTransferStock();
@@ -93,17 +93,14 @@ export function StockPage() {
     return acc;
   }, {});
 
-  const srcProducts = (allProducts.length > 0 ? allProducts : products).filter((p: Product) => p.isActive);
+  const srcProducts = (allProducts.length > 0 ? allProducts : products)
+    .filter((p: Product) => p.isActive)
+    .sort((a: Product, b: Product) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }) || a.id.localeCompare(b.id));
   const mergedStockItems: Stock[] = srcProducts
     .map((p: Product) => {
       const record = stockMap.get(p.id) ?? ({ id: `v-${p.id}`, productId: p.id, companyId, quantity: 0, lastUpdated: '' } as Stock);
       if (p.tracksLot) return { ...record, quantity: lotQtyByProduct[p.id] ?? 0 };
       return record;
-    })
-    .sort((a: Stock, b: Stock) => {
-      if (a.quantity > 0 && b.quantity === 0) return -1;
-      if (a.quantity === 0 && b.quantity > 0) return 1;
-      return 0;
     });
 
   const ITEMS_PER_PAGE = 20;
