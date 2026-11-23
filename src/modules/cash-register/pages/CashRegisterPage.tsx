@@ -16,6 +16,9 @@ import { filterCashEntries, downloadMovements } from '../utils/cashMovements';
 import { CashPageHeader } from '../components/CashPageHeader';
 import { useAuth } from '../../../app/providers/AuthProvider';
 
+const isLinkedEntry = (entry: CashRegisterEntry | null) => !!entry && (!!entry.referenceId || ['SALE', 'CREDIT_PAYMENT'].includes(entry.category));
+const canEditEntry = (entry: CashRegisterEntry) => !isLinkedEntry(entry) || !entryPaymentMethod(entry);
+
 export function CashRegisterPage() {
   const readOnly = useAccountingReadOnly();
   const { selectedBranch } = useAuth();
@@ -52,6 +55,7 @@ export function CashRegisterPage() {
   const [rucFound, setRucFound] = useState('');
   const [rucLoading, setRucLoading] = useState(false);
 
+  const selectedEntryIsLinked = isLinkedEntry(selectedEntry);
   const isClosed = register?.status === 'CLOSED';
   const entries: CashRegisterEntry[] = register?.entries || [];
   const activeEntries = entries.filter(e => !e.isDeleted);
@@ -92,7 +96,17 @@ export function CashRegisterPage() {
     await addEntry.mutateAsync({ registerId: register.id, data: { ...rest, description: rest.description.trim(), ...(hasRemision ? { remisionGuia: { serie: remisionSerie, correlativo: remisionCorrelativo, fecha: remisionFecha } } : {}) } });
     setShowAddModal(false);
   };
-  const handleEdit = async (e: React.FormEvent) => { e.preventDefault(); await editEntry.mutateAsync({ registerId: register.id, entryId: selectedEntry!.id, data: { ...editForm, paymentMethodId: editForm.paymentMethodId || undefined } }); setShowEditModal(false); };
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { voucherType, voucherSeries, voucherNumber, ...paymentEdit } = editForm;
+    await editEntry.mutateAsync({ registerId: register.id, entryId: selectedEntry!.id, data: {
+      ...paymentEdit,
+      amount: selectedEntryIsLinked ? selectedEntry!.amount : editForm.amount,
+      paymentMethodId: editForm.paymentMethodId || undefined,
+      ...(!selectedEntryIsLinked ? { voucherType, voucherSeries, voucherNumber } : {}),
+    } });
+    setShowEditModal(false);
+  };
   const handleDelete = async (e: React.FormEvent) => { e.preventDefault(); await deleteEntryMutation.mutateAsync({ registerId: register.id, entryId: selectedEntry!.id, data: { reason: deleteReason } }); setShowDeleteModal(false); };
   const categoryLabels = cashCategoryLabels;
   const groupedRows = useMemo(() => groupEntries([...filteredEntries].reverse()), [entries, filters]);
@@ -163,10 +177,10 @@ export function CashRegisterPage() {
         <td className="px-4 py-3">
           {!entry.isDeleted && !nested && (
             <div className="flex gap-1 justify-center">
-              <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => openEdit(entry)} title="Editar"
+              {canEditEntry(entry) && <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => openEdit(entry)} title="Editar"
                 className="p-1.5 text-blue-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
                 <Edit2 size={13} />
-              </button></WriteAccess>
+              </button></WriteAccess>}
               <WriteAccess excludeRoles={['VENDEDOR']}><button disabled={!!entry.referenceId} onClick={() => openDelete(entry)} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'}
                 className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 rounded-lg transition-colors">
                 <Trash2 size={13} />
@@ -238,10 +252,10 @@ export function CashRegisterPage() {
         </div>
         {!isClosed && !entry.isDeleted && !nested && (
           <div className="flex gap-1 flex-shrink-0">
-            <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => openEdit(entry)}
+            {canEditEntry(entry) && <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => openEdit(entry)} title="Editar"
               className="p-2 text-blue-400 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
               <Edit2 size={14} />
-            </button></WriteAccess>
+            </button></WriteAccess>}
             <WriteAccess excludeRoles={['VENDEDOR']}><button disabled={!!entry.referenceId} title={entry.referenceId ? 'Revisa este cobro desde Ventas o Créditos' : 'Anular movimiento manual'} onClick={() => openDelete(entry)}
               className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-30 rounded-lg transition-colors">
               <Trash2 size={14} />
@@ -580,7 +594,11 @@ export function CashRegisterPage() {
             Monto actual: <span className="font-bold text-gray-800">S/ {selectedEntry?.amount.toFixed(2)}</span>
           </div>
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Nuevo monto (S/)</label>
-            <input type="number" disabled={!!selectedEntry?.referenceId} min="0.01" step="0.01" value={editForm.amount || ''} onChange={e => setEditForm({ ...editForm, amount: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required /></div>
+            <input type="number" disabled={selectedEntryIsLinked} min="0.01" step="0.01" value={editForm.amount || ''} onChange={e => setEditForm({ ...editForm, amount: parseFloat(e.target.value) || 0 })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" required /></div>
+          {selectedEntryIsLinked ? <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm" aria-label="Comprobante de origen">
+            <p className="font-semibold text-gray-800">{selectedEntry?.voucherType === 'BOLETA' ? 'Boleta' : selectedEntry?.voucherType === 'FACTURA' ? 'Factura' : 'Nota de venta'}{[selectedEntry?.voucherSeries, selectedEntry?.voucherNumber].filter(Boolean).length > 0 ? ` · ${[selectedEntry?.voucherSeries, selectedEntry?.voucherNumber].filter(Boolean).join('-')}` : ''}</p>
+            <p className="mt-1 text-gray-600">El comprobante, su serie y su número se conservan. Cualquier corrección debe realizarse desde la operación original.</p>
+          </div> : <>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Comprobante</label>
             <div className="flex gap-2">
@@ -602,9 +620,10 @@ export function CashRegisterPage() {
                 <input value={editForm.voucherNumber} onChange={e => setEditForm({ ...editForm, voucherNumber: e.target.value.replace(/\D/g, '').slice(0, 8) })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="00000001" /></div>
             </div>
           )}
+          </>}
           <div><label className="mb-1 block text-sm font-medium text-gray-700">Método de pago</label>
-            {selectedEntry?.referenceId && entryPaymentMethod(selectedEntry) ? <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">{entryPaymentMethod(selectedEntry)} · Vinculado a la operación original</p> : <select value={editForm.paymentMethodId} onChange={e => setEditForm({ ...editForm, paymentMethodId: e.target.value })} className="w-full rounded-lg border border-gray-200 p-2 text-sm"><option value="">{selectedEntry ? entryPaymentMethod(selectedEntry) || 'Seleccionar método' : 'Seleccionar método'}</option>{paymentMethods.filter(pm => pm.isActive).map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}</select>}
-            {!!selectedEntry?.referenceId && <p className="mt-1 text-xs text-gray-500">El importe se conserva porque pertenece a una venta o abono.</p>}
+            {selectedEntryIsLinked && selectedEntry && entryPaymentMethod(selectedEntry) ? <p className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">{entryPaymentMethod(selectedEntry)} · Vinculado a la operación original</p> : <select aria-label="Método de pago del movimiento" value={editForm.paymentMethodId} onChange={e => setEditForm({ ...editForm, paymentMethodId: e.target.value })} className="w-full rounded-lg border border-gray-200 p-2 text-sm"><option value="">{selectedEntry ? entryPaymentMethod(selectedEntry) || 'Seleccionar método' : 'Seleccionar método'}</option>{paymentMethods.filter(pm => pm.isActive).map(pm => <option key={pm.id} value={pm.id}>{pm.name}</option>)}</select>}
+            {selectedEntryIsLinked && <p className="mt-1 text-xs text-gray-500">El importe se conserva porque pertenece a la operación original.</p>}
           </div>
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Razón del cambio <span className="text-red-500">*</span></label>
             <textarea minLength={5} value={editForm.reason} onChange={e => setEditForm({ ...editForm, reason: e.target.value })} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" rows={2} required /></div>
