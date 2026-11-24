@@ -14,18 +14,21 @@ const { MemoryRouter } = require('react-router-dom');
 const base = fileURLToPath(new URL('../', import.meta.url));
 const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : (node?.children || []).map(text).join('');
 
-async function harness(t, overrides = {}) {
+async function harness(t, overrides = {}, role = 'ADMIN') {
   const entry = { id: 'entry', type: 'INCOME', category: 'SALE', amount: 118, description: 'Venta de prueba', referenceId: 'sale', referenceType: 'Sale', voucherType: 'BOLETA', voucherSeries: 'BAG3', voucherNumber: '00000001', paymentMethodId: 'cash', paymentMethodName: 'Efectivo', isDeleted: false, editHistory: [], ...overrides };
   const register = { id: 'register', status: 'OPEN', date: '2026-11-23', openingBalance: 0, entries: [entry] };
-  const writes = [];
+  const writes = [], reads = [];
   const wrap = data => ({ data: { data } });
   const api = {
     get: async url => {
+      reads.push(url);
       if (url === '/cash-registers/today') return wrap(register);
       if (url === '/payment-methods') return wrap([{ id: 'cash', name: 'Efectivo', isActive: true }]);
+      if (url === '/lookup/ruc/20600000001') return wrap({ razonSocial: 'EMPRESA DE PRUEBA', direccion: 'Dirección de prueba' });
       throw Error('Unexpected read: ' + url);
     },
     patch: async (url, data) => { writes.push({ url, data }); return wrap(register); },
+    post: async (url, data) => { assert.equal(url, '/cash-registers/register/entries'); writes.push({ url, data }); return wrap(register); },
   };
   const cache = new Map();
   const load = filename => {
@@ -37,7 +40,7 @@ async function harness(t, overrides = {}) {
       if (specifier.startsWith('.')) {
         const target = path.resolve(path.dirname(filename), specifier);
         if (target === path.join(base, 'src/shared/services/api')) return { api };
-        if (target === path.join(base, 'src/app/providers/AuthProvider')) return { useAuth: () => ({ user: { role: 'ADMIN' }, selectedBranch: { id: 'branch', name: 'Sausal' } }) };
+        if (target === path.join(base, 'src/app/providers/AuthProvider')) return { useAuth: () => ({ user: { role }, selectedBranch: { id: 'branch', name: 'Sausal' } }) };
         if (target === path.join(base, 'src/shared/components/Modal')) return { Modal: ({ isOpen, children }) => isOpen ? React.createElement('section', {}, children) : null };
         const dependency = [target + '.ts', target + '.tsx'].find(existsSync);
         if (dependency) return load(dependency);
@@ -55,7 +58,7 @@ async function harness(t, overrides = {}) {
   await settle();
   t.after(() => { act(() => tree.unmount()); client.clear(); });
   const openEdit = async () => { await act(async () => tree.root.findAllByProps({ title: 'Editar' })[0].props.onClick()); };
-  return { tree, writes, settle, openEdit };
+  return { tree, writes, reads, settle, openEdit };
 }
 
 test('a linked sale with an identified payment has no edit action on either desktop or mobile', async t => {
@@ -99,4 +102,42 @@ test('manual expenses retain their supporting receipt editor', async t => {
   assert.equal(h.writes[0].data.voucherType, 'FACTURA');
   assert.equal(h.writes[0].data.voucherSeries, 'F001');
   assert.equal(h.writes[0].data.voucherNumber, '12');
+});
+
+test('sellers register income, operating expenses and withdrawals without gaining adjustment or editing actions', async t => {
+  const h = await harness(t, {}, 'VENDEDOR');
+  for (const action of [
+    { button: 'Ingreso', type: 'INCOME', category: 'OTHER', amount: 20 },
+    { button: 'Egreso', type: 'EXPENSE', category: 'OPERATING_EXPENSE', amount: 5 },
+    { button: 'Egreso', type: 'EXPENSE', category: 'WITHDRAWAL', amount: 10 },
+  ]) {
+    await act(async () => h.tree.root.findAllByType('button').find(button => text(button).trim() === action.button).props.onClick());
+    const category = h.tree.root.findByProps({ 'aria-label': 'Motivo del movimiento' });
+    assert.ok(!category.findAllByType('option').some(option => ['SALE', 'CREDIT_PAYMENT', 'ADJUSTMENT', 'PURCHASE'].includes(option.props.value)));
+    await act(async () => category.props.onChange({ target: { value: action.category } }));
+    await act(async () => h.tree.root.findByProps({ id: 'cash-entry-description' }).props.onChange({ target: { value: 'Movimiento autorizado del vendedor' } }));
+    await act(async () => h.tree.root.findByProps({ id: 'cash-entry-amount' }).props.onChange({ target: { value: String(action.amount) } }));
+    const form = h.tree.root.findByType('form');
+    const cash = form.findAllByType('button').find(button => text(button).trim() === 'Efectivo');
+    if (cash) await act(async () => cash.props.onClick());
+    await act(async () => form.props.onSubmit({ preventDefault() {} }));
+    await h.settle();
+    const saved = h.writes.at(-1).data;
+    assert.equal(saved.type, action.type); assert.equal(saved.category, action.category); assert.equal(saved.amount, action.amount); assert.equal(saved.paymentMethodId, 'cash');
+  }
+  assert.equal(h.writes.length, 3);
+  assert.equal(h.tree.root.findAllByProps({ title: 'Editar' }).length, 0);
+  assert.ok(!h.tree.root.findAllByType('button').some(button => text(button).trim() === 'Ajuste'));
+});
+
+test('a seller can look up an expense RUC without accessing or creating suppliers', async t => {
+  const h = await harness(t, {}, 'VENDEDOR');
+  await act(async () => h.tree.root.findAllByType('button').find(button => text(button).trim() === 'Egreso').props.onClick());
+  await act(async () => h.tree.root.findByProps({ placeholder: 'RUC (11 dígitos)' }).props.onChange({ target: { value: '20600000001' } }));
+  await act(async () => h.tree.root.findByType('form').findAllByType('button').find(button => text(button).trim() === 'Buscar').props.onClick());
+  await h.settle();
+  assert.equal(h.tree.root.findByProps({ id: 'cash-entry-description' }).props.value, 'EMPRESA DE PRUEBA');
+  assert.ok(h.reads.includes('/lookup/ruc/20600000001'));
+  assert.ok(!h.reads.some(url => url.startsWith('/suppliers')));
+  assert.equal(h.writes.length, 0);
 });

@@ -87,7 +87,9 @@ test('sellers can open cash and reconcile without editing, deleting or adjusting
  const register={id,date:'2026-11-21',openingBalance:100,status:'OPEN',revision:3,entries:[{id:'a',description:'Venta en efectivo',amount:50,type:'INCOME',category:'SALE',paymentMethodName:'Efectivo',voucherType:'NONE',isDeleted:false,editHistory:[]},{id:'b',description:'Venta por Yape',amount:12,type:'INCOME',category:'SALE',paymentMethodName:'Yape',voucherType:'NONE',isDeleted:false,editHistory:[]}]};
  const h=await mount(t,'modules/cash-register/pages/CashRegisterPage','VENDEDOR','/',null,register);
  assert.ok(h.reads.includes('/cash-registers/today'));
- for(const label of h.buttons())assert.doesNotMatch(label,/^(?:\+?\s*)?(?:Ingreso|Egreso|Ajuste|Editar|Anular movimiento manual)$/);
+ assert.ok(h.buttons().some(label=>label.trim()==='Ingreso'));
+ assert.ok(h.buttons().some(label=>label.trim()==='Egreso'));
+ for(const label of h.buttons())assert.doesNotMatch(label,/^(?:\+?\s*)?(?:Ajuste|Editar|Anular movimiento manual)$/);
  assert.equal(h.tree.root.findAllByType('button').some(button=>['Editar','Anular movimiento manual'].includes(button.props.title)),false);
  const close=h.tree.root.findAllByType('button').find(button=>text(button).includes('Cerrar Caja'));assert.ok(close);
  await act(async()=>close.props.onClick());

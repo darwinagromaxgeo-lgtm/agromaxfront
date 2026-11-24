@@ -21,7 +21,8 @@ const canEditEntry = (entry: CashRegisterEntry) => !isLinkedEntry(entry) || !ent
 
 export function CashRegisterPage() {
   const readOnly = useAccountingReadOnly();
-  const { selectedBranch } = useAuth();
+  const { selectedBranch, user } = useAuth();
+  const isSeller = user?.role === 'VENDEDOR';
   const { data: register, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useCashRegisterToday();
   const openCashRegister = useOpenCashRegister();
   const addEntry = useAddCashEntry();
@@ -74,14 +75,14 @@ export function CashRegisterPage() {
     const ruc = rucInput.trim();
     if (ruc.length !== 11) return;
     setRucLoading(true);
-    try {
+    if (!isSeller) try {
       const local = await supplierByRuc.mutateAsync(ruc);
       if (local) { setRucFound(local.businessName); setAddForm((prev) => ({ ...prev, description: local.businessName })); setRucLoading(false); return; }
     } catch { /* not found locally */ }
     try {
       const result = await rucLookup.mutateAsync(ruc);
       if (result?.razonSocial) {
-        await createSupplier.mutateAsync({ ruc, businessName: result.razonSocial, address: result.direccion || '' });
+        if (!isSeller) await createSupplier.mutateAsync({ ruc, businessName: result.razonSocial, address: result.direccion || '' });
         setRucFound(result.razonSocial);
         setAddForm((prev) => ({ ...prev, description: result.razonSocial }));
       }
@@ -309,8 +310,8 @@ export function CashRegisterPage() {
     <div className="space-y-5">
       <CashPageHeader branchName={selectedBranch?.name} actions={<div className="flex items-center gap-3"><span className="text-xs text-gray-500">Actualizado {dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('es-PE', { timeZone: 'America/Lima', hour: '2-digit', minute: '2-digit' }) : '—'}</span><button onClick={() => void refetch()} disabled={isFetching} className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"><RefreshCw size={15} className={isFetching ? 'animate-spin' : ''} />Actualizar</button></div>} />
       <CashOverview register={register} actions={!isClosed ? <div className="flex flex-wrap gap-2">
-        <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddIncome} className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-primary-800 hover:bg-primary-50"><TrendingUp size={16} />Ingreso</button></WriteAccess>
-        <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddExpense} className="flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/20"><TrendingDown size={16} />Egreso</button></WriteAccess>
+        <WriteAccess><button onClick={openAddIncome} className="flex items-center gap-1.5 rounded-xl bg-white px-3 py-2.5 text-sm font-bold text-primary-800 hover:bg-primary-50"><TrendingUp size={16} />Ingreso</button></WriteAccess>
+        <WriteAccess><button onClick={openAddExpense} className="flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/20"><TrendingDown size={16} />Egreso</button></WriteAccess>
         <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={() => { setAdjustForm({ openingBalance: register.openingBalance || 0, reason: '' }); setShowAdjustModal(true); }} className="flex items-center gap-1.5 rounded-xl border border-white/30 bg-white/10 px-3 py-2.5 text-sm font-semibold text-white hover:bg-white/20"><SlidersHorizontal size={16} />Ajuste</button></WriteAccess>
         <WriteAccess><button onClick={() => { setCloseTarget(register); setShowCloseModal(true); }} className="flex items-center gap-1.5 rounded-xl bg-gray-950/40 px-3 py-2.5 text-sm font-bold text-white hover:bg-gray-950/60"><Lock size={16} />Cerrar Caja</button></WriteAccess>
       </div> : undefined} />
@@ -358,8 +359,8 @@ export function CashRegisterPage() {
               <p className="text-sm text-gray-400">No hay movimientos que coincidan</p>
               {!isClosed && (
                 <div className="flex items-center justify-center gap-2 mt-3">
-                  <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button></WriteAccess>
-                  <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button></WriteAccess>
+                  <WriteAccess><button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button></WriteAccess>
+                  <WriteAccess><button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button></WriteAccess>
                 </div>
               )}
             </div>
@@ -485,8 +486,8 @@ export function CashRegisterPage() {
                     <p className="text-sm text-gray-400">No hay movimientos que coincidan</p>
                     {!isClosed && (
                       <div className="flex items-center justify-center gap-2 mt-3">
-                        <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button></WriteAccess>
-                        <WriteAccess excludeRoles={['VENDEDOR']}><button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button></WriteAccess>
+                        <WriteAccess><button onClick={openAddIncome} className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-medium hover:bg-primary-700">+ Ingreso</button></WriteAccess>
+                        <WriteAccess><button onClick={openAddExpense} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-medium hover:bg-red-600">+ Egreso</button></WriteAccess>
                       </div>
                     )}
                   </td>
@@ -499,7 +500,7 @@ export function CashRegisterPage() {
 
       {/* ── Modals ── */}
 
-      <WriteAccess excludeRoles={['VENDEDOR']}>
+      <WriteAccess>
       <Modal isOpen={showAddModal} onClose={() => { setShowAddModal(false); setRucInput(''); setRucFound(''); }}
         title={addForm.type === 'INCOME' ? 'Nuevo Ingreso' : 'Nuevo Egreso'}>
         <form onSubmit={handleAdd} className="space-y-4">
@@ -507,8 +508,8 @@ export function CashRegisterPage() {
             {addForm.type === 'INCOME' ? <><TrendingUp size={15} /> Registrando un ingreso</> : <><TrendingDown size={15} /> Registrando un egreso</>}
           </div>
           <div><label className="mb-1 block text-sm font-medium text-gray-700">Motivo del movimiento</label>
-            <select value={addForm.category} onChange={e => setAddForm({ ...addForm, category: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
-              {(addForm.type === 'INCOME' ? ['OTHER', 'CAPITAL_CONTRIBUTION'] : ['OPERATING_EXPENSE', 'WITHDRAWAL', 'PURCHASE', 'OTHER']).map(category => <option key={category} value={category}>{categoryLabels[category]}</option>)}
+            <select aria-label="Motivo del movimiento" value={addForm.category} onChange={e => setAddForm({ ...addForm, category: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              {(addForm.type === 'INCOME' ? ['OTHER', 'CAPITAL_CONTRIBUTION'] : isSeller ? ['OPERATING_EXPENSE', 'WITHDRAWAL', 'OTHER'] : ['OPERATING_EXPENSE', 'WITHDRAWAL', 'PURCHASE', 'OTHER']).map(category => <option key={category} value={category}>{categoryLabels[category]}</option>)}
             </select>
             <p className="mt-1 text-xs text-gray-500">Registra las ventas en POS y los abonos en Créditos para mantener sus saldos vinculados.</p>
           </div>
@@ -527,7 +528,8 @@ export function CashRegisterPage() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Comprobante</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Documento de sustento</label>
+            <p className="mb-2 text-xs text-gray-500">Registra el sustento de este movimiento. Esta opción no emite ni modifica comprobantes de venta.</p>
             <div className="flex gap-2">
               {[{ value: 'NONE', label: 'Ninguno' }, { value: 'BOLETA', label: 'Boleta' }, { value: 'FACTURA', label: 'Factura' }].map(opt => (
                 <button key={opt.value} type="button" onClick={() => setAddForm({ ...addForm, voucherType: opt.value, voucherSeries: '', voucherNumber: '' })}
@@ -587,7 +589,9 @@ export function CashRegisterPage() {
           </button>
         </form>
       </Modal>
+      </WriteAccess>
 
+      <WriteAccess excludeRoles={['VENDEDOR']}>
       <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Editar Movimiento">
         <form onSubmit={handleEdit} className="space-y-4">
           <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600">
