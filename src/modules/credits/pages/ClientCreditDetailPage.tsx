@@ -33,9 +33,9 @@ export function ClientCreditDetailPage() {
   const client = clients.find((c: Client) => c.id === clientId);
 
   const totalPending = credits.reduce((sum, c) => sum + c.pendingAmount, 0);
-  const totalDebt = credits.reduce((sum, c) => sum + c.totalAmount, 0);
-  const totalPaid = credits.reduce((sum, c) => sum + c.paidAmount, 0);
-  const openCredits = credits.filter((c) => c.status !== 'PAID');
+  const totalDebt = credits.filter(c => c.status !== 'CANCELLED').reduce((sum, c) => sum + c.totalAmount, 0);
+  const totalPaid = credits.filter(c => c.status !== 'CANCELLED').reduce((sum, c) => sum + c.paidAmount, 0);
+  const openCredits = credits.filter((c) => ['PENDING', 'PARTIAL'].includes(c.status));
 
   const transactionGroups: TransactionGroup[] = useMemo(() => {
     const byGroup = new Map<string, TransactionGroup>();
@@ -81,6 +81,7 @@ export function ClientCreditDetailPage() {
   }, [credits]);
 
   const statusLabels: Record<string, { label: string; class: string }> = {
+    CANCELLED: { label: 'Anulado', class: 'bg-gray-100 text-gray-600' },
     PENDING: { label: 'Pendiente', class: 'bg-yellow-100 text-yellow-800' },
     PARTIAL: { label: 'Parcial', class: 'bg-blue-100 text-blue-800' },
     PAID: { label: 'Pagado', class: 'bg-primary-100 text-primary-800' },

@@ -15,8 +15,8 @@ import toast from 'react-hot-toast';
 import type { CreditAccount, Client } from '../../../shared/types';
 import { useAuth } from '../../../app/providers/AuthProvider';
 
-type Status = 'PENDING' | 'PARTIAL' | 'PAID';
-const STATUS_RANK: Record<Status, number> = { PENDING: 3, PARTIAL: 2, PAID: 1 };
+type Status = CreditAccount['status'];
+const STATUS_RANK: Record<Status, number> = { PENDING: 3, PARTIAL: 2, PAID: 1, CANCELLED: 0 };
 
 interface ClientGroup {
   clientId: string;
@@ -32,6 +32,7 @@ const statusLabels: Record<Status, { label: string; class: string }> = {
   PENDING: { label: 'Pendiente', class: 'bg-yellow-100 text-yellow-800' },
   PARTIAL: { label: 'Parcial', class: 'bg-blue-100 text-blue-800' },
   PAID: { label: 'Pagado', class: 'bg-primary-100 text-primary-800' },
+  CANCELLED: { label: 'Anulado', class: 'bg-gray-100 text-gray-600' },
 };
 
 const PAGE_SIZE = 10;
@@ -78,12 +79,13 @@ export function CreditsPage() {
 
     const result: ClientGroup[] = [];
     for (const [clientId, clientCredits] of byClient.entries()) {
-      const totalAmount = clientCredits.reduce((s, c) => s + c.totalAmount, 0);
-      const paidAmount = clientCredits.reduce((s, c) => s + c.paidAmount, 0);
-      const pendingAmount = clientCredits.reduce((s, c) => s + c.pendingAmount, 0);
+      const activeCredits = clientCredits.filter(c => c.status !== 'CANCELLED');
+      const totalAmount = activeCredits.reduce((s, c) => s + c.totalAmount, 0);
+      const paidAmount = activeCredits.reduce((s, c) => s + c.paidAmount, 0);
+      const pendingAmount = activeCredits.reduce((s, c) => s + c.pendingAmount, 0);
       const worstStatus = clientCredits.reduce<Status>(
         (worst, c) => (STATUS_RANK[c.status as Status] > STATUS_RANK[worst] ? (c.status as Status) : worst),
-        'PAID',
+        'CANCELLED',
       );
       result.push({
         clientId,
@@ -120,7 +122,7 @@ export function CreditsPage() {
   };
 
   const openBatchForGroup = (group: ClientGroup) => {
-    const openCredits = group.credits.filter((c) => c.status !== 'PAID');
+    const openCredits = group.credits.filter((c) => ['PENDING', 'PARTIAL'].includes(c.status));
     if (openCredits.length === 0) return;
     setBatchClient({ id: group.clientId, name: group.clientName, credits: openCredits });
   };
@@ -198,6 +200,7 @@ export function CreditsPage() {
           <option value="PENDING">Pendiente</option>
           <option value="PARTIAL">Parcial</option>
           <option value="PAID">Pagado</option>
+          <option value="CANCELLED">Anulado</option>
         </select>
         <div className="text-sm text-gray-500 ml-auto">
           {groups.length} {groups.length === 1 ? 'cliente' : 'clientes'}
@@ -307,10 +310,10 @@ export function CreditsPage() {
                                 <button title="Descargar PDF detallado" onClick={() => handleDownloadCreditPdf(c)} disabled={pdfLoadingId === c.id} className="px-2.5 py-1.5 text-gray-500 hover:text-primary-600 bg-gray-50 hover:bg-gray-100 rounded-md disabled:opacity-50 transition-colors">
                                   {pdfLoadingId === c.id ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
                                 </button>
-                                <WriteAccess excludeRoles={['VENDEDOR']}><button title="Editar crédito" onClick={() => openEdit(c)} className="px-2.5 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
+                                <WriteAccess excludeRoles={['VENDEDOR']}><button title="Editar crédito" disabled={c.status === 'CANCELLED'} onClick={() => openEdit(c)} className="px-2.5 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
                                   <Edit2 size={13} />
                                 </button></WriteAccess>
-                                <WriteAccess excludeRoles={['VENDEDOR']}><button title="Eliminar crédito" onClick={() => openDelete(c)} className="px-2.5 py-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors">
+                                <WriteAccess excludeRoles={['VENDEDOR']}><button title="Eliminar crédito" disabled={c.status === 'CANCELLED'} onClick={() => openDelete(c)} className="px-2.5 py-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors">
                                   <Trash2 size={13} />
                                 </button></WriteAccess>
                               </div>
@@ -350,8 +353,8 @@ export function CreditsPage() {
                                       <button title="Descargar PDF detallado" onClick={() => handleDownloadCreditPdf(c)} disabled={pdfLoadingId === c.id} className="text-gray-500 hover:text-primary-600 disabled:opacity-50">
                                         {pdfLoadingId === c.id ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
                                       </button>
-                                      <WriteAccess excludeRoles={['VENDEDOR']}><button title="Editar crédito" onClick={() => openEdit(c)} className="text-blue-600 hover:text-blue-800"><Edit2 size={13} /></button></WriteAccess>
-                                      <WriteAccess excludeRoles={['VENDEDOR']}><button title="Eliminar crédito" onClick={() => openDelete(c)} className="text-red-600 hover:text-red-800"><Trash2 size={13} /></button></WriteAccess>
+                                      <WriteAccess excludeRoles={['VENDEDOR']}><button title="Editar crédito" disabled={c.status === 'CANCELLED'} onClick={() => openEdit(c)} className="text-blue-600 hover:text-blue-800"><Edit2 size={13} /></button></WriteAccess>
+                                      <WriteAccess excludeRoles={['VENDEDOR']}><button title="Eliminar crédito" disabled={c.status === 'CANCELLED'} onClick={() => openDelete(c)} className="text-red-600 hover:text-red-800"><Trash2 size={13} /></button></WriteAccess>
                                     </div>
                                   </td>
                                 </tr>

@@ -4,13 +4,14 @@ import toast from 'react-hot-toast';
 import { billingService } from '../../billing/services/billingService';
 import type { BillingDocument } from '../../billing/types';
 import type { Sale } from '../../../shared/types';
+import { WriteAccess } from '../../../shared/components/WriteAccess';
 import { activeFiscalDocuments, billingBlocksCancellation, billingReference, fiscalDocumentState, saleUsesInternalNote } from '../utils/saleBilling';
 
 export function SaleBillingBadge({ sale, documents, loading, error }: { sale: Sale; documents: BillingDocument[]; loading: boolean; error: boolean }) {
   if (loading) return <span className="text-xs text-gray-400">Consultando comprobante…</span>;
   if (error) return <span className="text-xs text-amber-700">Estado no disponible</span>;
   const noteReference = sale.noteSeries && sale.noteNumber ? `${sale.noteSeries}-${String(sale.noteNumber).padStart(8, '0')}` : '';
-  if (!documents.length) return <span className="text-xs text-gray-500">{sale.voucherType === 'NONE' ? `Nota de venta${noteReference ? ` · ${noteReference}` : ''}` : `${sale.voucherType === 'FACTURA' ? 'Factura' : 'Boleta'} · sin emitir`}</span>;
+  if (!documents.length) return <span className="text-xs text-gray-500">{sale.isCancelled ? 'Venta anulada' : sale.voucherType === 'NONE' ? `Nota de venta${noteReference ? ` · ${noteReference}` : ''}` : `${sale.voucherType === 'FACTURA' ? 'Factura' : 'Boleta'} · sin emitir`}</span>;
   return <div className="space-y-1.5">{saleUsesInternalNote(sale, documents) && <p className="text-xs font-semibold text-slate-700">Nota de venta{noteReference ? ` · ${noteReference}` : ''}</p>}{documents.map(document => <div key={document.id} className="flex flex-wrap items-center gap-1.5">
     <span className="font-mono text-xs font-semibold text-slate-800">{billingReference(document)}</span>
     <span className={`rounded-md px-2 py-1 text-[11px] font-semibold ${fiscalDocumentState(document).color}`}>{fiscalDocumentState(document).label}</span>
@@ -35,11 +36,12 @@ export function SaleBillingDocuments({ documents, onPreview }: { documents: Bill
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => onPreview(document)} className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700"><Eye size={15} /> Ver A4 y ticket</button>
         <a href={`/billing?documentId=${document.id}`} className="inline-flex items-center rounded-lg border px-3 py-2 text-xs font-medium text-gray-700">Abrir en Facturación</a>
+        {document.status === 'ACCEPTED' && !document.cancelledByCreditNoteId && <WriteAccess excludeRoles={['VENDEDOR']}><a href={`/billing?documentId=${document.id}&cancelSale=1`} className="inline-flex items-center rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700">Anular venta con nota de crédito</a></WriteAccess>}
         {(['pdf', 'xml', 'cdr'] as const).filter(format => document[format === 'pdf' ? 'hasPdf' : format === 'xml' ? 'hasXml' : 'hasCdr']).map(format => <button key={format} type="button" disabled={!!downloading} onClick={() => void download(document, format)} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium text-gray-700 disabled:opacity-50">{downloading === `${document.id}:${format}` ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}{format === 'pdf' ? 'PDF emitido' : format.toUpperCase()}</button>)}
       </div>
     </article>)}
     {documents.length > 0 && !activeFiscalDocuments(documents).length
-      ? <p className="text-xs text-slate-500">La venta queda como nota de venta. Los comprobantes anulados se conservan como historial, junto con sus notas de crédito. Los productos y pagos del pedido se mantienen.</p>
+      ? <p className="text-xs text-slate-500">{documents.some(document => document.saleCancelledAt) ? 'Venta anulada. Los productos regresaron al stock de su sucursal y se revirtieron sus cobros y su deuda. Los comprobantes y las notas de crédito se conservan en el historial.' : documents.some(document => document.cancelSaleOnAcceptance) ? 'Resuelve los comprobantes restantes para completar la anulación de la venta y devolver su stock.' : 'Estos comprobantes se anularon con el flujo anterior, que conservaba la venta como nota de venta. Puedes anular también la venta desde su opción Anular.'}</p>
       : billingBlocksCancellation(documents) && <p className="text-xs text-slate-500">Esta venta tiene una emisión enviada o pendiente de verificar; la anulación operativa no está disponible.</p>}
   </section>;
 }

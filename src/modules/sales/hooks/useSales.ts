@@ -42,7 +42,7 @@ export function useCancelSale() {
       qc.invalidateQueries({ queryKey: ['cash-register-today'] });
       qc.invalidateQueries({ queryKey: ['cash-registers'] });
       qc.invalidateQueries({ queryKey: ['cash-register'] });
-      qc.invalidateQueries({ queryKey: ['credit-accounts'] });
+      for (const key of ['credits', 'credit', 'stock-availability', 'stock-branches', 'billing', 'billing-detail', 'billing-credit-notes', 'credit-note-detail', 'sales-billing', 'dashboard']) qc.invalidateQueries({ queryKey: [key] });
       toast.success('Venta anulada');
     },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Error al anular'),

@@ -18,7 +18,7 @@ const formatDate = (d?: string | Date) => {
 const money = (n: number) => `S/ ${(n || 0).toFixed(2)}`;
 
 const statusLabel = (s: string) =>
-  s === 'PAID' ? 'Pagado' : s === 'PARTIAL' ? 'Parcial' : 'Pendiente';
+  s === 'CANCELLED' ? 'Anulado' : s === 'PAID' ? 'Pagado' : s === 'PARTIAL' ? 'Parcial' : 'Pendiente';
 
 const statusColor = (s: string) =>
   s === 'PAID' ? '#059669' : s === 'PARTIAL' ? '#2563eb' : '#d97706';
@@ -66,8 +66,8 @@ function baseHeader(title: string, filters?: ExportParams['filters'], subtitle?:
 }
 
 function summaryTotals(credits: CreditAccount[]) {
-  const total = credits.reduce((s, c) => s + c.totalAmount, 0);
-  const paid = credits.reduce((s, c) => s + c.paidAmount, 0);
+  const total = credits.filter(c => c.status !== 'CANCELLED').reduce((s, c) => s + c.totalAmount, 0);
+  const paid = credits.filter(c => c.status !== 'CANCELLED').reduce((s, c) => s + c.paidAmount, 0);
   const pending = credits.reduce((s, c) => s + c.pendingAmount, 0);
   return { total, paid, pending, count: credits.length };
 }

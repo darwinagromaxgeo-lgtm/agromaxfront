@@ -14,14 +14,15 @@ export const billingReference = (document: BillingDocument) => document.series &
 export const fiscalDocumentState = (document:BillingDocument) => document.cancelledByCreditNoteId ? {label:'Anulado por nota de crédito',color:'bg-gray-100 text-gray-600'} : saleBillingStates[document.status];
 export const saleFiscalDocuments = (documents: BillingDocument[], saleId: string) => documents.filter(document => document.saleId === saleId && document.status !== 'DISCARDED');
 export const activeFiscalDocuments = (documents: BillingDocument[]) => documents.filter(document => document.status !== 'DISCARDED' && !document.cancelledByCreditNoteId);
-export const saleUsesInternalNote = (sale: Sale, documents: BillingDocument[]) => !activeFiscalDocuments(documents).length && (sale.voucherType === 'NONE' || documents.some(document => !!document.cancelledByCreditNoteId));
+export const saleUsesInternalNote = (sale: Sale, documents: BillingDocument[]) => !sale.isCancelled && !documents.some(document => document.saleCancelledAt) && !activeFiscalDocuments(documents).length && (sale.voucherType === 'NONE' || documents.some(document => !!document.cancelledByCreditNoteId));
 export function saleVoucherLabel(sale: Sale, documents: BillingDocument[]) {
+  if (sale.isCancelled || documents.some(document => document.saleCancelledAt)) return 'Venta anulada';
   const active = activeFiscalDocuments(documents);
   if (active.length) return [...new Set(active.map(document => document.documentType === 'FACTURA' ? 'Factura' : 'Boleta'))].join(' / ');
   if (saleUsesInternalNote(sale, documents)) return 'Nota de venta';
   return sale.voucherType === 'FACTURA' ? 'Factura' : 'Boleta';
 }
-export const billingBlocksCancellation = (documents: BillingDocument[]) => documents.some(document => ['SENDING', 'PENDING', 'ACCEPTED', 'UNKNOWN'].includes(document.status));
+export const billingBlocksCancellation = (documents: BillingDocument[]) => documents.some(document => !(document.status === 'ACCEPTED' && document.cancelledByCreditNoteId) && ['SENDING', 'PENDING', 'ACCEPTED', 'UNKNOWN'].includes(document.status));
 
 export function voucherExportRows(sales: Sale[], documents: BillingDocument[], context: { clients: Map<string, Client>; companies: Map<string, Company>; products: Map<string, Product> }) {
   return sales.filter(sale => !sale.isCancelled).flatMap<Record<string, string | number>>(sale => {

@@ -89,7 +89,7 @@ function DocumentSummary({ document }: { document: BillingDocument }) {
     {document.sunatDescription && <div className="rounded-lg bg-gray-50 p-3 text-sm"><strong>Respuesta del servicio{document.sunatCode ? ` · ${document.sunatCode}` : ''}</strong><p className="mt-1 whitespace-pre-wrap">{document.sunatDescription}</p>{document.ticket && <p className="mt-2 text-xs break-all">Ticket: {document.ticket}</p>}</div>}
     {document.status === 'UNKNOWN' && <p className="rounded-lg bg-orange-50 text-orange-900 p-3 text-sm">El resultado requiere revisión. No se habilita un nuevo envío para evitar duplicar un comprobante que pudo haber sido recibido.</p>}
     {document.discardReason && <p className="text-sm text-gray-500">Motivo de descarte: {document.discardReason}</p>}
-    {document.cancelledByCreditNoteId && <p className="rounded-lg bg-gray-100 p-3 text-sm">Comprobante anulado mediante nota de crédito aceptada. El pedido y sus pagos se conservan. {document.cancellationReason}</p>}
+    {document.cancelledByCreditNoteId && <p className="rounded-lg bg-gray-100 p-3 text-sm">{document.saleCancelledAt ? 'Venta y comprobante anulados. Stock, cobros y deuda revertidos.' : document.cancelSaleOnAcceptance ? 'Comprobante anulado. Resuelve los demás comprobantes de la venta para completar su anulación.' : 'Comprobante anulado con el flujo anterior, que conservaba la venta y sus pagos.'} {document.cancellationReason}</p>}
   </div>;
 }
 
@@ -142,7 +142,10 @@ export function BillingPage() {
   const linkedSale = searchParams.get('saleId');
   useEffect(() => {
     if (!allowed) return;
-    if (linkedDocument && /^[a-f\d]{24}$/i.test(linkedDocument)) setDetailId(linkedDocument);
+    if (linkedDocument && /^[a-f\d]{24}$/i.test(linkedDocument)) {
+      if (!readOnly && searchParams.get('cancelSale') === '1') { setCreditOriginalId(linkedDocument); setNotesView(true); }
+      else setDetailId(linkedDocument);
+    }
     else if (!readOnly && linkedSale && /^[a-f\d]{24}$/i.test(linkedSale)) { setSaleId(linkedSale); setCreateOpen(true); }
   }, [allowed, readOnly, branchId, linkedDocument, linkedSale]);
   useEffect(() => { setLegacyConfirmed(false); }, [saleId, groupKey, documentType]);
@@ -237,8 +240,8 @@ export function BillingPage() {
       {detail.isLoading ? <p>Cargando…</p> : detail.error ? <p className="text-red-700">{apiError(detail.error)}</p> : document && <div className="space-y-5"><button className={buttonClass} onClick={() => setFormatPreview({ document })}><Eye size={16} /> Vista A4 y ticket</button><DocumentSummary document={document} /><IdentityCheck key={`${branchId}:${document.id}`} document={document} />
       {simulationResult && document.status === 'DRAFT' && <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3"><p className="font-bold text-blue-900">SIMULACIÓN · SIN VALIDEZ TRIBUTARIA</p><button className={buttonClass} onClick={() => setFormatPreview({ document: simulationResult.document, simulation: true })}><Eye size={16} /> Ver simulación en A4 y ticket</button><p className="text-sm">{simulationResult.message}</p>{simulationResult.service && <p className="text-sm font-medium">{simulationResult.service.message}</p>}<ul className="space-y-2 text-sm">{simulationResult.checks.map(check => <li key={check.label}><span className="font-semibold">{check.passed ? '✓' : 'Pendiente:'} {check.label}.</span> {check.detail}</li>)}</ul><button className={buttonClass} disabled={downloading} onClick={() => simulationResult.service?.verified ? billingService.downloadSimulation(simulationResult, 'pdf') : downloadDraft(simulationResult.document, true)}><Download size={15} /> Descargar PDF de simulación</button>{simulationResult.service?.verified && <button className={`${buttonClass} ml-2`} onClick={() => billingService.downloadSimulation(simulationResult, 'xml')}><Download size={15} /> XML de simulación</button>}</div>}
       <div className="flex flex-wrap gap-2">
-        {document.status==='ACCEPTED' && !document.cancelledByCreditNoteId && <WriteAccess><button className={buttonClass} onClick={()=>{setCreditOriginalId(document.id);setDetailId(null);setNotesView(true);}}><Undo2 size={15} /> Anular comprobante con nota de crédito</button></WriteAccess>}
-        {document.cancelledByCreditNoteId && <WriteAccess><button className={primaryClass} onClick={()=>{setReissueId(document.id);setDetailId(null);}}>Volver a emitir pedido</button></WriteAccess>}
+        {document.status==='ACCEPTED' && !document.cancelledByCreditNoteId && <WriteAccess><button className={buttonClass} onClick={()=>{setCreditOriginalId(document.id);setDetailId(null);setNotesView(true);}}><Undo2 size={15} /> Anular venta con nota de crédito</button></WriteAccess>}
+        {document.cancelledByCreditNoteId && !document.cancelSaleOnAcceptance && !document.saleCancelledAt && <WriteAccess><button className={primaryClass} onClick={()=>{setReissueId(document.id);setDetailId(null);}}>Volver a emitir pedido</button></WriteAccess>}
         {document.replacementDocumentId && <button className={buttonClass} onClick={()=>setDetailId(document.replacementDocumentId!)}>Ver comprobante nuevo</button>}
         {document.replacesDocumentId && <button className={buttonClass} onClick={()=>setDetailId(document.replacesDocumentId!)}>Ver comprobante anterior</button>}
         {document.status === 'DRAFT' && <WriteAccess><button className={primaryClass} disabled={simulation.isPending} onClick={() => simulation.mutate(document.id)}><FlaskConical size={15} /> {simulation.isPending ? 'Simulando…' : 'Simular sin enviar'}</button></WriteAccess>}

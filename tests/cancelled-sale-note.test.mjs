@@ -12,12 +12,21 @@ const billing=loadTs(fileURLToPath(new URL('../src/modules/sales/utils/saleBilli
 const sale={id:'sale',voucherType:'BOLETA',isCancelled:false};
 const original={id:'original',saleId:'sale',documentType:'BOLETA',status:'ACCEPTED',series:'BAG3',number:4,total:30,taxType:'GRAVADO',issuer:{name:'Emisor',documentNumber:'20600000001'},receiver:{name:'Cliente',documentType:'UNIDENTIFIED'},cancelledByCreditNoteId:'accepted-note'};
 
+test('an operationally cancelled sale never appears as an active sales note',()=>{
+  const cancelled={...sale,isCancelled:true};
+  assert.equal(billing.saleUsesInternalNote(cancelled,[original]),false);
+  assert.equal(billing.saleVoucherLabel(cancelled,[original]),'Venta anulada');
+  const newlyCancelled={...original,cancelSaleOnAcceptance:true,saleCancelledAt:'2026-11-23T23:00:00Z'};
+  assert.equal(billing.saleUsesInternalNote(sale,[newlyCancelled]),false,'A stale sale detail must respect the confirmed cancellation');
+  assert.equal(billing.saleVoucherLabel(sale,[newlyCancelled]),'Venta anulada');
+});
+
 test('an accepted cancellation becomes a sales note even when the open detail still holds the old voucher type',()=>{
   assert.equal(billing.saleUsesInternalNote(sale,[original]),true);
   assert.equal(billing.saleVoucherLabel(sale,[original]),'Nota de venta');
   assert.equal(billing.activeFiscalDocuments([original]).length,0);
   assert.equal(billing.saleFiscalDocuments([original],sale.id).length,1,'The original receipt remains available as history');
-  assert.equal(billing.billingBlocksCancellation([original]),true,'Displaying a sales note must not enable an unintended inventory refund');
+  assert.equal(billing.billingBlocksCancellation([original]),false,'A fully cancelled legacy receipt permits explicit operational cancellation');
 });
 
 test('an active replacement or unresolved document keeps its fiscal label and disables the internal-note print flow',()=>{
@@ -36,6 +45,7 @@ function components(){
   const originalRequire=loaded.require.bind(loaded);
   loaded.require=specifier=>{
     if(specifier==='../utils/saleBilling')return billing;
+    if(specifier==='../../../shared/components/WriteAccess')return{WriteAccess:({children})=>children};
     if(specifier==='../../billing/services/billingService')return{billingService:{download:()=>{throw Error('No network request is permitted in this test');}}};
     return originalRequire(specifier);
   };
@@ -48,6 +58,16 @@ test('the visible badge and document detail show a sales note while preserving t
   const badge=renderToStaticMarkup(React.createElement(SaleBillingBadge,{sale,documents:[original],loading:false,error:false}));
   assert.match(badge,/Nota de venta/);assert.match(badge,/BAG3-00000004/);assert.match(badge,/Anulado por nota de crédito/);
   const detail=renderToStaticMarkup(React.createElement(SaleBillingDocuments,{documents:[original],onPreview:()=>{}}));
-  assert.match(detail,/La venta queda como nota de venta/);assert.match(detail,/BAG3-00000004/);assert.match(detail,/se conservan como historial/);
+  assert.match(detail,/flujo anterior/);assert.match(detail,/BAG3-00000004/);assert.match(detail,/anular también la venta/);
   assert.doesNotMatch(detail,/El tipo de comprobante se conserva/);
+});
+
+test('a newly cancelled sale detail reports the stock reversal without showing an active sales note',()=>{
+  const {SaleBillingBadge,SaleBillingDocuments}=components();
+  const cancelled={...original,cancelSaleOnAcceptance:true,saleCancelledAt:'2026-11-23T23:00:00Z'};
+  const badge=renderToStaticMarkup(React.createElement(SaleBillingBadge,{sale,documents:[cancelled],loading:false,error:false}));
+  assert.doesNotMatch(badge,/Nota de venta/);
+  const detail=renderToStaticMarkup(React.createElement(SaleBillingDocuments,{documents:[cancelled],onPreview:()=>{}}));
+  assert.match(detail,/Venta anulada/);assert.match(detail,/stock de su sucursal/);assert.match(detail,/se revirtieron sus cobros/);
+  assert.doesNotMatch(detail,/cancelSale=1/);
 });

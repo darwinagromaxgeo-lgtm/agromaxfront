@@ -60,6 +60,8 @@ export interface BillingDocument {
   hasCdr?: boolean;
   discardReason?: string;
   cancelledByCreditNoteId?:string;
+  cancelSaleOnAcceptance?:boolean;
+  saleCancelledAt?:string;
   cancelledAt?:string;
   cancellationReason?:string;
   replacesDocumentId?:string;
@@ -109,6 +111,7 @@ export interface BillingCreditNote extends Omit<BillingDocument,'documentType'|'
 export interface CreditNoteInput {
   originalDocumentId:string;
   returnType:'CANCEL'|'TOTAL'|'PARTIAL';
+  cancelSaleOnAcceptance?:boolean;
   reason:string;
   items?:{ itemIndex:number; quantity:number }[];
 }

@@ -37,7 +37,7 @@ test('cancelled receipts remain in history and do not double the replacement amo
   const rows=voucherExportRows([sale],[cancelled,replacement],context);
   assert.equal(rows.length,2);assert.equal(rows[0]['Estado SUNAT'],'Anulado por nota de crédito');assert.equal(rows[0].Total,0);assert.equal(rows[0]['Importe anulado'],document.total);
   assert.equal(rows[1].Total,document.total);assert.equal(rows.reduce((sum,row)=>sum+row.Total,0),document.total);
-  assert.equal(billingBlocksCancellation([cancelled]),true,'Fiscal cancellation must not enable operational cancellation that restores stock or money');
+  assert.equal(billingBlocksCancellation([cancelled]),false,'An accepted full cancellation allows cancelling the remaining legacy sale');
 });
 
 test('fiscal associations stay scoped to their sale and block operational cancellation only for submitted states', () => {
