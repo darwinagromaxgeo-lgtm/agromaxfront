@@ -5,7 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './app/providers/AuthProvider';
 import { AppRoutes } from './app/routes/AppRoutes';
+import { installNumberInputWheelGuard } from './shared/utils/numberInputWheel';
 import './index.css';
+
+const removeNumberInputWheelGuard = installNumberInputWheelGuard();
+if (import.meta.hot) import.meta.hot.dispose(removeNumberInputWheelGuard);
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
