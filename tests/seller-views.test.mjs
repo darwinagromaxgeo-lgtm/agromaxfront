@@ -16,3 +16,11 @@ test('administrator navigation remains available and its home is the dashboard',
   assert.equal(roleHome('ADMIN'), '/dashboard');
   for (const path of ['/dashboard', '/pos', '/cash-register', '/purchases', '/stock', '/billing', '/admin', '/users']) assert.equal(canAccessView('ADMIN', path), true, path);
 });
+
+test('only a seller with an explicit transfer grant gains the branch-transfer view', () => {
+  const user = { role: 'VENDEDOR', canTransferStock: true };
+  assert.equal(canAccessView('VENDEDOR', '/stock-requests', user), true);
+  assert.equal(canAccessView('VENDEDOR', '/stock-requests', { ...user, canTransferStock: false }), false);
+  for (const route of ['/stock', '/users', '/products', '/stock-requests/edit', '/purchases', '/admin']) assert.equal(canAccessView('VENDEDOR', route, user), false, route);
+  assert.equal(canAccessView('CONTABILIDAD', '/stock-requests', user), false);
+});

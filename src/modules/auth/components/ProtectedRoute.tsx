@@ -16,7 +16,7 @@ export function ProtectedRoute({ children, roles }: ProtectedRouteProps) {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  if (!canAccessView(accessRole(user, selectedBranch?.id), location.pathname) || (roles && !roles.includes(user.role))) {
+  if (!canAccessView(accessRole(user, selectedBranch?.id), location.pathname, user) || (roles && !roles.includes(user.role))) {
     return <Navigate to={roleHome(user.role)} replace />;
   }
   return <>{children}</>;

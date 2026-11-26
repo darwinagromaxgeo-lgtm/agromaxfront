@@ -5,7 +5,7 @@ import { SearchableSelect } from '../../../shared/components/SearchableSelect';
 import { Pagination } from '../../../shared/components/Pagination';
 import type { Company, Product } from '../../../shared/types';
 import { useStockAvailability } from '../hooks/useStockRequests';
-import { useBranchTransfers, useCreateBranchTransfer } from '../hooks/useBranchTransfers';
+import { useBranchTransferOptions, useBranchTransfers, useCreateBranchTransfer } from '../hooks/useBranchTransfers';
 import type { BranchTransfer, BranchTransferPayload } from '../services/branchTransferService';
 
 type Row = { productId: string; quantity: string };
@@ -62,15 +62,18 @@ export function DirectTransfersPanel({ companies, products, initialCompanyId }: 
   const [availability, setAvailability] = useState<Record<string, number | null>>({});
   const saving = useRef(false);
   const history = useBranchTransfers(filterBranch, page);
+  const options = useBranchTransferOptions(selectedBranch?.id || '');
   const mutation = useCreateBranchTransfer();
-  const activeBranches = branches.filter(branch => branch.isActive);
-  const from = activeBranches.find(branch => branch.id === fromBranchId), to = activeBranches.find(branch => branch.id === toBranchId);
+  const activeBranches = (options.data?.branches || branches).filter(branch => branch.isActive);
+  const sourceBranches = activeBranches.filter(branch => options.data?.sourceBranchIds.includes(branch.id));
+  const historyBranches = user?.role === 'ADMIN' ? activeBranches : sourceBranches;
+  const from = sourceBranches.find(branch => branch.id === fromBranchId), to = activeBranches.find(branch => branch.id === toBranchId);
   const eligibleCompanies = useMemo(() => companies.filter(company => company.isActive && from?.companyIds.includes(company.id) && (!to || to.companyIds.includes(company.id))), [companies, from, to]);
   useEffect(() => {
     if (!pending && !review && !eligibleCompanies.some(company => company.id === companyId)) setCompanyId(eligibleCompanies.find(company => company.id === initialCompanyId)?.id || eligibleCompanies[0]?.id || '');
   }, [companyId, initialCompanyId, eligibleCompanies, pending, review]);
   const reportAvailability = useCallback((key: string, value: number | null) => setAvailability(previous => previous[key] === value ? previous : { ...previous, [key]: value }), []);
-  const valid = !!from && !!to && fromBranchId !== toBranchId && eligibleCompanies.some(company => company.id === companyId) && rows.length > 0 && new Set(rows.map(row => row.productId)).size === rows.length && rows.every(row => {
+  const valid = options.isSuccess && !!from && !!to && fromBranchId !== toBranchId && eligibleCompanies.some(company => company.id === companyId) && rows.length > 0 && new Set(rows.map(row => row.productId)).size === rows.length && rows.every(row => {
     const value = Number(row.quantity), available = availability[keyFor(companyId, fromBranchId, row.productId)];
     return !!row.productId && row.quantity.trim() !== '' && Number.isFinite(value) && value >= .000001 && Math.abs(Math.round(value * 1_000_000) / 1_000_000 - value) < 1e-10 && typeof available === 'number' && value <= available;
   });
@@ -93,11 +96,12 @@ export function DirectTransfersPanel({ companies, products, initialCompanyId }: 
     {saved && <section role="status" className="rounded-xl border border-primary-200 bg-primary-50 p-4"><h2 className="flex items-center gap-2 font-bold text-primary-900"><CheckCircle2 size={20} />Transferencia completada · {saved.reference}</h2><p className="mt-1 text-sm text-primary-900">{saved.fromBranchName} → {saved.toBranchName}. Stock y Kardex actualizados en ambas sucursales.</p></section>}
     <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
       <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900"><ArrowRightLeft size={20} />Transferencia directa</h2><p className="mb-5 mt-1 text-sm text-gray-600">Traslada productos y registra su ingreso en destino en una sola confirmación.</p>
+      {options.isError && <p role="alert" className="mb-4 text-sm text-red-700">No se pudieron cargar las sucursales. <button type="button" onClick={() => void options.refetch()} className="font-bold underline">Volver a intentar</button></p>}
       {pending && <p role="status" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Hay un envío pendiente de confirmación. Reintenta esta misma transferencia para comprobar el resultado.</p>}
       <form onSubmit={event => { event.preventDefault(); if (valid) { setReview(true); setError(''); setSaved(null); } }}>
         <fieldset disabled={review || !!pending || mutation.isPending} className="space-y-4 disabled:opacity-75">
           <div className="grid gap-3 sm:grid-cols-3">
-            <label className="text-sm font-semibold text-gray-700">Origen<select aria-label="Sucursal de origen" required value={fromBranchId} onChange={event => { setFromBranchId(event.target.value); if (toBranchId === event.target.value) setToBranchId(''); }} className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm font-normal"><option value="">Seleccionar sucursal</option>{activeBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
+            <label className="text-sm font-semibold text-gray-700">Origen<select aria-label="Sucursal de origen" required value={fromBranchId} onChange={event => { setFromBranchId(event.target.value); if (toBranchId === event.target.value) setToBranchId(''); }} className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm font-normal"><option value="">Seleccionar sucursal</option>{sourceBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
             <label className="text-sm font-semibold text-gray-700">Destino<select aria-label="Sucursal de destino" required value={toBranchId} onChange={event => setToBranchId(event.target.value)} className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm font-normal"><option value="">Seleccionar sucursal</option>{activeBranches.filter(branch => branch.id !== fromBranchId).map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label>
             <label className="text-sm font-semibold text-gray-700">Empresa / RUC<select aria-label="Empresa del traslado" required value={companyId} onChange={event => setCompanyId(event.target.value)} className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white p-2.5 text-sm font-normal"><option value="">Seleccionar empresa</option>{eligibleCompanies.map(company => <option key={company.id} value={company.id}>{company.name}</option>)}</select></label>
           </div>
@@ -112,7 +116,7 @@ export function DirectTransfersPanel({ companies, products, initialCompanyId }: 
       {error && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     </section>
     <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 p-4"><h2 className="font-bold text-gray-900">Historial de transferencias directas</h2><div className="flex gap-2"><select aria-label="Sucursal del historial de transferencias" value={filterBranch} onChange={event => { setFilterBranch(event.target.value); setPage(1); }} className="min-w-0 rounded-lg border border-gray-200 p-2 text-sm"><option value="">Todas las sucursales</option>{activeBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><button onClick={() => void history.refetch()} aria-label="Actualizar transferencias" className="rounded-lg border border-gray-200 p-2 text-gray-600"><RefreshCw size={16} /></button></div></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 p-4"><h2 className="font-bold text-gray-900">Historial de transferencias directas</h2><div className="flex gap-2"><select aria-label="Sucursal del historial de transferencias" value={filterBranch} onChange={event => { setFilterBranch(event.target.value); setPage(1); }} className="min-w-0 rounded-lg border border-gray-200 p-2 text-sm">{user?.role === 'ADMIN' && <option value="">Todas las sucursales</option>}{historyBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select><button onClick={() => void history.refetch()} aria-label="Actualizar transferencias" className="rounded-lg border border-gray-200 p-2 text-gray-600"><RefreshCw size={16} /></button></div></div>
       {history.isLoading ? <p className="p-5 text-sm text-gray-500">Cargando transferencias...</p> : history.isError ? <p role="alert" className="p-5 text-sm text-red-700">No se pudo cargar el historial. Vuelve a actualizar.</p> : !history.data?.total ? <p className="p-8 text-center text-sm text-gray-500">Todavía no hay transferencias directas en esta vista.</p> : <div className="divide-y divide-gray-100">{history.data.data.map(transfer => <article key={transfer.id} className="p-4"><div className="flex flex-wrap justify-between gap-2"><p className="font-bold text-gray-900">{transfer.fromBranchName} → {transfer.toBranchName}</p><span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-bold text-primary-800">Completada · {transfer.reference}</span></div><p className="mt-1 text-xs text-gray-500">{new Date(transfer.createdAt).toLocaleString('es-PE', { timeZone: 'America/Lima' })} · {transfer.transferredByName} · {transfer.companyName}</p><ul className="mt-3 space-y-2">{transfer.items.map(item => <li key={item.productId} className="rounded-lg bg-gray-50 p-3 text-sm"><p className="font-semibold text-gray-800">{item.productName} · {amount(item.quantity)} {item.unit}</p><p className="mt-1 text-xs text-gray-600">Origen {amount(item.sourcePrevious)} → {amount(item.sourceCurrent)} · Destino {amount(item.destinationPrevious)} → {amount(item.destinationCurrent)}</p>{item.lots.length > 0 && <p className="mt-1 text-xs text-gray-500">Lotes: {item.lots.map(lot => `${lot.lotNumber} (${amount(lot.quantity)})`).join(', ')}</p>}</li>)}</ul>{transfer.notes && <p className="mt-3 whitespace-pre-line text-sm text-gray-600">{transfer.notes}</p>}</article>)}</div>}
       <div className="px-4"><Pagination page={page} totalPages={Math.ceil((history.data?.total || 0) / 20)} onPageChange={setPage} /></div>
     </section>

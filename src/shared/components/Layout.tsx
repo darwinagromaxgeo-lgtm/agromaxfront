@@ -182,7 +182,7 @@ export function Layout() {
         <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-4 space-y-5">
           {navSections.map((section) => {
             const visibleItems = section.items.filter(
-              (item) => canAccessView(viewRole, item.path) && (!item.roles || item.roles.includes(user?.role || '')),
+              (item) => canAccessView(viewRole, item.path, user) && (!item.roles || item.roles.includes(user?.role || '')),
             );
             if (visibleItems.length === 0) return null;
             return (
@@ -373,7 +373,7 @@ export function Layout() {
         {/* Mobile Bottom Navigation Bar */}
         <nav className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 lg:hidden">
           <div className="flex items-stretch h-16">
-            {bottomNav.filter(item => canAccessView(viewRole, item.path)).map(({ path, label, icon: Icon }) => {
+            {bottomNav.filter(item => canAccessView(viewRole, item.path, user)).map(({ path, label, icon: Icon }) => {
               const isActive = path === '/dashboard'
                 ? location.pathname === path || location.pathname === '/'
                 : location.pathname === path || location.pathname.startsWith(path + '/');
@@ -449,7 +449,7 @@ export function Layout() {
           <div className="overflow-y-auto flex-1 px-4 py-3 space-y-4">
             {navSections.map((section) => {
               const visibleItems = section.items.filter(
-                (item) => canAccessView(viewRole, item.path) && (!item.roles || item.roles.includes(user?.role || '')),
+                (item) => canAccessView(viewRole, item.path, user) && (!item.roles || item.roles.includes(user?.role || '')),
               );
               if (visibleItems.length === 0) return null;
               return (

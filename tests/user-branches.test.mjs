@@ -55,6 +55,12 @@ test('a failed creation retains its values and displays a readable error so it c
  h.setFailure(false);await h.field('Usuario','otro-vendedor');await h.submit();assert.equal(h.writes.length,2);assert.equal(h.tree.root.findAllByProps({role:'dialog'}).length,0);
 });
 
+test('an administrator explicitly enables transfers for a seller while new sellers default to no permission',async t=>{
+ const h=await mount(t);await h.click('Nuevo Usuario');await h.fill();
+ const checkbox=h.tree.root.findByProps({'aria-label':'Permitir transferencias entre sucursales'});assert.equal(checkbox.props.checked,false);
+ await act(async()=>checkbox.props.onChange({target:{checked:true}}));await h.submit();assert.equal(h.writes[0].data.canTransferStock,true);assert.deepEqual(h.writes[0].data.branchAssignments,[{branchId:'sausal',role:'VENDEDOR'}]);
+});
+
 test('a branch is required for staff while administrators retain global access',async t=>{
  const h=await mount(t);await h.click('Nuevo Usuario');await h.fill();await act(async()=>h.tree.root.findByProps({'aria-label':'Sausal'}).props.onChange());await h.submit();
  assert.equal(h.writes.length,0);assert.match(text(h.tree.root.findByProps({role:'alert'})),/al menos una sucursal/);

@@ -16,6 +16,7 @@ import { useAuth } from '../../../app/providers/AuthProvider';
 import { Modal } from '../../../shared/components/Modal';
 import { SearchableSelect } from '../../../shared/components/SearchableSelect';
 import { DirectTransfersPanel } from '../components/DirectTransfersPanel';
+import { canTransferBetweenBranches } from '../../../shared/utils/accessPolicy';
 import type {
   BranchAvailability,
   Company,
@@ -76,6 +77,21 @@ function formatDate(value?: string) {
 }
 
 export function StockRequestsPage() {
+  const { user } = useAuth();
+  if (user?.role === 'VENDEDOR') return canTransferBetweenBranches(user) ? <SellerTransfersPage /> : <p role="alert">No tienes permiso para realizar transferencias.</p>;
+  return <StockRequestsWorkspace />;
+}
+
+function SellerTransfersPage() {
+  const { selectedBranch } = useAuth();
+  const { data: companiesData } = useCompanies();
+  const { data: productsData, isLoading } = useProducts({ page: 1, limit: 1000 });
+  const companies = (Array.isArray(companiesData) ? companiesData : []).filter((company: Company) => company.isActive && selectedBranch?.companyIds.includes(company.id));
+  if (!selectedBranch) return <p>Selecciona una sucursal para transferir productos.</p>;
+  return <div className="space-y-5 p-4 sm:p-6"><div><h1 className="text-2xl font-bold text-gray-900">Entre sucursales</h1><p className="mt-1 text-sm text-gray-600">Transfiere productos desde {selectedBranch.name} y consulta los movimientos de tu sucursal.</p></div>{isLoading ? <p>Cargando productos...</p> : <DirectTransfersPanel key={selectedBranch.id} companies={companies} products={productsData?.data || []} initialCompanyId={selectedBranch.defaultCompanyId || companies[0]?.id || ''} />}</div>;
+}
+
+function StockRequestsWorkspace() {
   const { user, selectedBranch } = useAuth();
   const [mainTab, setMainTab] = useState<MainTab>(() => user?.role === 'ADMIN' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'direct' ? 'direct' : 'availability');
   const [companyId, setCompanyId] = useState('');

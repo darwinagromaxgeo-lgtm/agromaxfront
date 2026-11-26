@@ -38,21 +38,21 @@ export function UsersPage() {
   const changePassword = useChangePassword();
   const toggleStatus = useToggleUserStatus();
 
-  const [createForm, setCreateForm] = useState({ username: '', email: '', password: '', fullName: '', role: 'VENDEDOR', branchIds: [] as string[] });
-  const [editForm, setEditForm] = useState({ fullName: '', role: '', username: '', email: '', branchIds: [] as string[] });
+  const [createForm, setCreateForm] = useState({ username: '', email: '', password: '', fullName: '', role: 'VENDEDOR', branchIds: [] as string[], canTransferStock: false });
+  const [editForm, setEditForm] = useState({ fullName: '', role: '', username: '', email: '', branchIds: [] as string[], canTransferStock: false });
   const [passwordForm, setPasswordForm] = useState({ newPassword: '' });
 
   const openCreate = () => {
     if (!canManageUsers) return;
     setCreateError('');
-    setCreateForm({ username: '', email: '', password: '', fullName: '', role: 'VENDEDOR', branchIds: selectedBranch && branches.some(branch => branch.id === selectedBranch.id) ? [selectedBranch.id] : [] });
+    setCreateForm({ username: '', email: '', password: '', fullName: '', role: 'VENDEDOR', branchIds: selectedBranch && branches.some(branch => branch.id === selectedBranch.id) ? [selectedBranch.id] : [], canTransferStock: false });
     setShowCreateModal(true);
   };
 
   const openEdit = (user: User) => {
     setEditError('');
     setEditingUser(user);
-    setEditForm({ fullName: user.fullName, role: user.role, username: user.username, email: user.email || '', branchIds: (user.branchAssignments || []).map((assignment) => assignment.branchId) });
+    setEditForm({ fullName: user.fullName, role: user.role, username: user.username, email: user.email || '', branchIds: (user.branchAssignments || []).map((assignment) => assignment.branchId), canTransferStock: user.canTransferStock === true });
   };
 
   const openPassword = (user: User) => {
@@ -67,6 +67,7 @@ export function UsersPage() {
     if (createForm.role !== 'ADMIN' && !createForm.branchIds.length) { setCreateError('Selecciona al menos una sucursal para el usuario'); return; }
     const payload: any = { username: createForm.username.trim(), password: createForm.password, fullName: createForm.fullName.trim(), role: createForm.role, branchAssignments: createForm.role === 'ADMIN' ? [] : createForm.branchIds.map((branchId) => ({ branchId, role: createForm.role })) };
     if (createForm.email.trim()) payload.email = createForm.email.trim();
+    payload.canTransferStock = createForm.role === 'VENDEDOR' && createForm.canTransferStock;
     try {
       await createUser.mutateAsync(payload);
       setShowCreateModal(false);
@@ -80,6 +81,7 @@ export function UsersPage() {
     setEditError('');
     if (editForm.role !== 'ADMIN' && !editForm.branchIds.length) { setEditError('Selecciona al menos una sucursal para el usuario'); return; }
     const payload: any = { fullName: editForm.fullName.trim(), role: editForm.role, username: editForm.username.trim(), email: editForm.email.trim(), branchAssignments: editForm.role === 'ADMIN' ? [] : editForm.branchIds.map((branchId) => ({ branchId, role: editForm.role })) };
+    payload.canTransferStock = editForm.role === 'VENDEDOR' && editForm.canTransferStock;
     try {
       await updateUser.mutateAsync({ id: editingUser.id, data: payload });
       setEditingUser(null);
@@ -252,6 +254,7 @@ export function UsersPage() {
               <option value="ADMIN">Admin</option>
             </select>
           </div>
+          {createForm.role === 'VENDEDOR' && <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 text-sm text-gray-700"><input type="checkbox" aria-label="Permitir transferencias entre sucursales" checked={createForm.canTransferStock} onChange={event => setCreateForm({ ...createForm, canTransferStock: event.target.checked })} className="mt-0.5" /><span><strong>Permitir transferencias entre sucursales</strong><span className="mt-1 block text-xs text-gray-500">Podrá trasladar productos desde sus sucursales asignadas.</span></span></label>}
           <button type="submit" disabled={createUser.isPending} className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
             {createUser.isPending ? 'Creando...' : 'Crear Usuario'}
           </button>
@@ -284,6 +287,7 @@ export function UsersPage() {
               <option value="ADMIN">Admin</option>
             </select>
           </div>
+          {editForm.role === 'VENDEDOR' && <label className="flex items-start gap-3 rounded-lg border border-gray-200 p-3 text-sm text-gray-700"><input type="checkbox" aria-label="Permitir transferencias entre sucursales" checked={editForm.canTransferStock} onChange={event => setEditForm({ ...editForm, canTransferStock: event.target.checked })} className="mt-0.5" /><span><strong>Permitir transferencias entre sucursales</strong><span className="mt-1 block text-xs text-gray-500">Podrá trasladar productos desde sus sucursales asignadas.</span></span></label>}
           <button type="submit" disabled={updateUser.isPending} className="w-full py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
             {updateUser.isPending ? 'Guardando...' : 'Guardar Cambios'}
           </button>

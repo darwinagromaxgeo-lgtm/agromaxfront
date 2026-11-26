@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { branchTransferService, type BranchTransferPayload } from '../services/branchTransferService';
 
+export function useBranchTransferOptions(branchId: string) {
+  return useQuery({ queryKey: ['branch-transfer-options', branchId], queryFn: branchTransferService.options, enabled: !!branchId });
+}
+
 export function useBranchTransfers(branchId: string, page: number) {
   return useQuery({ queryKey: ['branch-transfers', branchId, page], queryFn: () => branchTransferService.list(branchId, page) });
 }

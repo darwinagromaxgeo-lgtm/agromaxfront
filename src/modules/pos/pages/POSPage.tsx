@@ -10,8 +10,8 @@ import { useCreateSale } from '../../sales/hooks/useSales';
 import { useCreateQuote, useQuote, useConvertQuote } from '../../quotes/hooks/useQuotes';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { stockService } from '../../stock/services/stockService';
-import { Search, Plus, Minus, Trash2, Package, X, ShoppingCart, CreditCard, User, Pencil, Tag, ScrollText, Landmark, ChevronDown, LayoutGrid, List, AlertTriangle } from 'lucide-react';
+import { usePOSStock } from '../hooks/usePOSStock';
+import { Search, Plus, Minus, Trash2, Package, X, ShoppingCart, CreditCard, User, Pencil, Tag, ScrollText, Landmark, ChevronDown, LayoutGrid, List, AlertTriangle, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Product, ProductPrice, Category, Company, Client, PriceTier, PaymentMethod, CreditAccount, ProductLot, Sale } from '../../../shared/types';
 import { productLotService } from '../../stock/services/productLotService';
@@ -123,7 +123,7 @@ export function POSPage() {
   const isBrowsingAllSubs = !!(selectedParentId && !categoryId);
   const isWideSearch = isSearching || isBrowsingAllSubs;
 
-  const { data: productsData, isFetching: productsFetching } = useProducts(
+  const { data: productsData, isFetching: productsFetching, refetch: refetchProducts } = useProducts(
     isWideSearch
       ? { sellableOnly: true, search: debouncedSearch || undefined, activeIngredient: debouncedIngredient || undefined, control: debouncedControl || undefined, category: categoryId || undefined, limit: 500 }
       : { sellableOnly: true, page: browsePage, limit: BROWSE_LIMIT, category: categoryId || (selectedParentId || undefined) },
@@ -291,12 +291,7 @@ export function POSPage() {
 
   const { data: openCredits } = useOpenClientCredits(isCredit ? clientId : '');
 
-  const { data: stockList } = useQuery({
-    queryKey: ['stock', companyId],
-    queryFn: () => stockService.getByCompany(companyId, { limit: 9999 }),
-    enabled: !!companyId,
-    staleTime: 30_000,
-  });
+  const { data: stockList, refetch: refetchStock, isFetching: stockFetching, isLoading: stockLoading } = usePOSStock(companyId, selectedBranch?.id);
 
   const [lotSelectorProduct, setLotSelectorProduct] = useState<Product | null>(null);
   const [pendingLotId, setPendingLotId] = useState<string>('');
@@ -754,6 +749,7 @@ export function POSPage() {
             </div>
             {/* Contador + toggle + empresa */}
             <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button type="button" aria-label="Actualizar productos y stock" title="Actualizar productos y stock sin vaciar el carrito" disabled={stockFetching || productsFetching} onClick={() => { void refetchProducts(); void refetchStock(); }} className="rounded-lg border border-gray-200 bg-white p-2 text-primary-700 hover:bg-primary-50 disabled:opacity-50"><RefreshCw size={16} className={stockFetching || productsFetching ? 'animate-spin' : ''} /></button>
               {productsFetching && isSearching && (
                 <span className="hidden sm:flex text-xs text-gray-400 whitespace-nowrap items-center gap-1.5">
                   <span className="w-3 h-3 rounded-full border-2 border-gray-300 border-t-primary-500 animate-spin inline-block" />
@@ -900,7 +896,7 @@ export function POSPage() {
                   const qty = cartQty(p.id);
                   const stock = stockByProduct[p.id] ?? 0;
                   const available = stock - qty;
-                  const isOutOfStock = stock === 0;
+                  const isOutOfStock = !stockLoading && stock === 0;
                   const ings = p.activeIngredients?.length
                     ? p.activeIngredients
                     : p.activeIngredient ? [{ name: p.activeIngredient, concentration: '' }] : [];
@@ -929,7 +925,7 @@ export function POSPage() {
                           {p.billingEnabled === false && <span className="text-[11px] font-medium text-amber-800">Solo nota de venta</span>}
                           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                             <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${isOutOfStock ? 'bg-red-50 text-red-600' : stock <= 10 ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-100 text-gray-500'}`}>
-                              {isOutOfStock ? 'Agotado' : `Stock: ${stock}`}
+                              {stockLoading ? 'Consultando stock...' : isOutOfStock ? 'Agotado' : `Stock: ${stock}`}
                             </span>
                             {price != null && (
                               <span className="text-sm font-bold text-gray-900">S/ {price.toFixed(2)}</span>
@@ -1004,7 +1000,7 @@ export function POSPage() {
                   : p.activeIngredient
                   ? [{ name: p.activeIngredient, concentration: '' }]
                   : [];
-                  const isOutOfStock = stock === 0;
+                  const isOutOfStock = !stockLoading && stock === 0;
                 const showingInfo = infoProductId === p.id;
                 const hasInfo = ings.length > 0 || !!p.control || !!p.dosis || !!p.location;
 
