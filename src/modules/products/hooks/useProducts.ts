@@ -11,7 +11,16 @@ export function useProducts(params?: any, options?: any) {
 }
 export function useCreateProduct() {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: productService.create, onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); toast.success('Producto creado'); }, onError: (err: any) => { const msg = err.response?.data?.message; toast.error(Array.isArray(msg) ? msg[0] : msg || 'Error'); } });
+  return useMutation({
+    mutationFn: productService.create,
+    onSuccess: async () => {
+      await Promise.all(['products', 'stock', 'stock-alerts', 'stock-availability', 'kardex', 'stock-movements'].map(key =>
+        qc.invalidateQueries({ queryKey: [key] }),
+      ));
+      toast.success('Producto creado');
+    },
+    onError: (err: any) => { const msg = err.response?.data?.message; toast.error(Array.isArray(msg) ? msg[0] : msg || 'Error'); },
+  });
 }
 export function useUpdateProduct() {
   const qc = useQueryClient();

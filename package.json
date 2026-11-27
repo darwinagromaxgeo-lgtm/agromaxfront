@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "test:products": "node --test tests/product-creation.test.mjs tests/pos-stock.test.mjs tests/product-billing.test.mjs",
     "test:security": "node --test --test-isolation=none tests/excel-compatibility.test.mjs",
     "test:billing": "node --test tests/billing-pdf.test.mjs tests/pos-billing.test.mjs tests/sales-billing.test.mjs",
     "test:checkout": "node --test tests/credit-checkout.test.mjs tests/pos-billing.test.mjs",
